@@ -200,6 +200,15 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Family parsing error:', error);
+    
+    // Enhanced error logging for debugging
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      status: (error as any)?.status,
+      code: (error as any)?.code,
+      type: (error as any)?.type,
+      response: (error as any)?.response?.data || (error as any)?.response,
+    });
 
     // Handle validation errors
     if (error instanceof z.ZodError) {
@@ -222,7 +231,7 @@ export async function POST(request: NextRequest) {
     }
 
     if ((error as any)?.status === 401 || (error as any)?.status === 403) {
-      console.error('OpenAI API authentication error');
+      console.error('OpenRouter API authentication error - check API key validity');
       return NextResponse.json({
         success: false,
         error: 'AI service configuration error. Please contact support.',
