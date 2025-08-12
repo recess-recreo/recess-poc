@@ -72,3 +72,11 @@ pids/
 *.so
 *.dylib
 *.dll
+
+# Large ML model files
+*.bin
+*.onnx
+*.safetensors
+
+# Additional development dependencies that might be large
+.claude-mpm/
