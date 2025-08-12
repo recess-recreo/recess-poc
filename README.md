@@ -205,4 +205,4 @@ curl -X POST http://localhost:3000/api/v1/ai/parse-family
 - POC uses simple password authentication
 - Session storage for demo purposes only
 - Not suitable for production without proper auth
-- API keys should be secured in production deployment
+- API keys should be secured in production deployment# Force Railway redeploy Tue Aug 12 15:45:11 EDT 2025
