@@ -136,11 +136,11 @@ echo
 # Set production environment variables
 echo "Setting production environment variables..."
 
-railway variables set NODE_ENV="production"
-railway variables set SESSION_SECRET="$SESSION_SECRET"
-railway variables set OPENROUTER_API_KEY="$OPENROUTER_API_KEY"
-railway variables set DEMO_PASSWORD="$DEMO_PASSWORD"
-railway variables set SITE_URL="https://your-project-production.up.railway.app"
+railway variables --set "NODE_ENV=production"
+railway variables --set "SESSION_SECRET=$SESSION_SECRET"
+railway variables --set "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
+railway variables --set "DEMO_PASSWORD=$DEMO_PASSWORD"
+railway variables --set "SITE_URL=https://your-project-production.up.railway.app"
 
 echo "✓ Environment variables configured"
 echo
@@ -182,7 +182,7 @@ echo "🚀 Next Steps:"
 echo "1. Wait for deployment to complete: railway status"
 echo "2. Get deployment URL: railway domain"
 echo "3. Update SITE_URL with actual URL:"
-echo "   railway variables set SITE_URL=\"https://your-actual-domain.railway.app\""
+echo "   railway variables --set \"SITE_URL=https://your-actual-domain.railway.app\""
 echo "4. Test the application"
 echo "5. Login with password: $DEMO_PASSWORD"
 echo

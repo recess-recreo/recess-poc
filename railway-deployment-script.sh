@@ -38,19 +38,19 @@ echo
 echo "Step 6: Setting environment variables..."
 
 # Production environment
-railway variables set NODE_ENV="production"
+railway variables --set "NODE_ENV=production"
 
 # Session configuration
-railway variables set SESSION_SECRET="sIDROVjRzCQ5HBhOGQ5Fl9k6YqKmZ7VEVG8G/wCMpBw="
+railway variables --set "SESSION_SECRET=sIDROVjRzCQ5HBhOGQ5Fl9k6YqKmZ7VEVG8G/wCMpBw="
 
 # API Keys
-railway variables set OPENROUTER_API_KEY="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"
+railway variables --set "OPENROUTER_API_KEY=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"
 
 # Demo configuration
-railway variables set DEMO_PASSWORD="recess2024"
+railway variables --set "DEMO_PASSWORD=recess2024"
 
 # Site URL (update this after deployment)
-railway variables set SITE_URL="https://poc-project-production.up.railway.app"
+railway variables --set "SITE_URL=https://poc-project-production.up.railway.app"
 
 echo "✓ Environment variables set"
 echo

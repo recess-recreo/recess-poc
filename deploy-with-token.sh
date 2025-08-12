@@ -126,23 +126,23 @@ echo "Step 5: Setting production environment variables..."
 
 # Production environment
 echo "Setting NODE_ENV=production..."
-railway variables set NODE_ENV="production"
+railway variables --set "NODE_ENV=production"
 
 # Session configuration
 echo "Setting SESSION_SECRET..."
-railway variables set SESSION_SECRET="$SESSION_SECRET"
+railway variables --set "SESSION_SECRET=$SESSION_SECRET"
 
 # API Keys
 echo "Setting OPENROUTER_API_KEY..."
-railway variables set OPENROUTER_API_KEY="$OPENROUTER_API_KEY"
+railway variables --set "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
 
 # Demo configuration
 echo "Setting DEMO_PASSWORD..."
-railway variables set DEMO_PASSWORD="$DEMO_PASSWORD"
+railway variables --set "DEMO_PASSWORD=$DEMO_PASSWORD"
 
 # Default site URL (will need to be updated after deployment)
 echo "Setting default SITE_URL..."
-railway variables set SITE_URL="https://your-project-production.up.railway.app"
+railway variables --set "SITE_URL=https://your-project-production.up.railway.app"
 
 echo "✓ Environment variables configured"
 echo
