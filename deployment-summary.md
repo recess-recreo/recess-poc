@@ -65,4 +65,4 @@ railway logs --service "recess-webapp-poc"
 ✅ Environment variables configured  
 ✅ Build process started successfully  
 
-The deployment is complete and should be accessible. Check the Railway dashboard to get the exact deployment URL.
+The deployment is complete and should be accessible. Check the Railway dashboard to get the exact deployment URL.# Railway Deployment Tue Aug 12 15:08:57 EDT 2025
