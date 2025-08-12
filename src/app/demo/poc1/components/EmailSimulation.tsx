@@ -44,27 +44,27 @@ interface EmailGeneration {
 
 // Mock provider details for email generation
 const providerDetails = {
-  1: { 
+  "1": { 
     contactName: "Sarah Mitchell", 
     email: "sarah@brooklynartsacademy.com",
     programName: "Young Artists Workshop"
   },
-  2: { 
+  "2": { 
     contactName: "Coach Mike Rodriguez", 
     email: "mike@nycsoccerstars.com",
     programName: "Youth Soccer Development"
   },
-  3: { 
+  "3": { 
     contactName: "Dr. Jennifer Chen", 
     email: "jennifer@stemkidsbrooklyn.com",
     programName: "Robotics & Engineering"
   },
-  4: { 
+  "4": { 
     contactName: "Ms. Ashley Thompson", 
     email: "ashley@dancedynamics.com",
     programName: "Kids Hip Hop & Jazz"
   },
-  5: { 
+  "5": { 
     contactName: "Coach Lisa Park", 
     email: "lisa@littlegymnasts.com",
     programName: "Beginner Gymnastics"

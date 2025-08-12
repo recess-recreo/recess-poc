@@ -233,8 +233,8 @@ Return only valid JSON matching the schema. Be thorough but accurate.`,
 export function createRecommendationPrompt(
   familyProfile: FamilyProfile,
   searchResults: Array<{
-    providerId: number;
-    programId?: number;
+    providerId: string;
+    programId?: string;
     score: number;
     metadata: {
       name: string;
@@ -247,7 +247,8 @@ export function createRecommendationPrompt(
       [key: string]: any;
     };
   }>,
-  maxRecommendations: number = 10
+  maxRecommendations: number = 10,
+  recommendationType?: 'family' | 'all_kids' | string
 ): {
   system: string;
   user: string;
@@ -265,6 +266,63 @@ export function createRecommendationPrompt(
   const budgetSummary = familyProfile.preferences?.budget ? 
     `$${familyProfile.preferences.budget.min || 0}-${familyProfile.preferences.budget.max || 'unlimited'} ${familyProfile.preferences.budget.currency}` :
     'Not specified';
+
+  // Create recommendation type-specific instructions
+  let recommendationTypeInstructions = '';
+  let recommendationFocus = '';
+  
+  if (recommendationType === 'family') {
+    recommendationTypeInstructions = `
+FAMILY RECOMMENDATION FOCUS:
+- PRIORITY: Activities that work for ALL family members (adults AND children)
+- Age range compatibility: Must accommodate the youngest to oldest family member
+- Adult engagement: Parents/guardians can actively participate, not just supervise
+- Family bonding opportunities: Shared experiences that bring the family together
+- Multi-generational appeal: Activities that create memories for everyone`;
+
+    recommendationFocus = `Focus on FAMILY ACTIVITIES where adults and children participate together. Score activities higher if they explicitly welcome adult participation and accommodate the full family age range.`;
+  
+  } else if (recommendationType === 'all_kids') {
+    recommendationTypeInstructions = `
+ALL KIDS RECOMMENDATION FOCUS:
+- PRIORITY: Activities where ALL children in the family can participate together
+- Age range compatibility: Must work for ages ${Math.min(...familyProfile.children.map(c => c.age))} to ${Math.max(...familyProfile.children.map(c => c.age))}
+- Sibling dynamics: Activities that promote cooperation and shared enjoyment
+- Simultaneous participation: All children can be active at the same time
+- Interest overlap: Activities that appeal to multiple interests represented in the family`;
+
+    recommendationFocus = `Focus on activities suitable for ALL CHILDREN (${familyProfile.children.map(c => `${c.name} age ${c.age}`).join(', ')}). Prioritize programs that accommodate multiple ages simultaneously.`;
+  
+  } else if (recommendationType && recommendationType !== 'family' && recommendationType !== 'all_kids') {
+    // Individual child recommendation
+    const targetChild = familyProfile.children.find(child => 
+      child.name.toLowerCase() === recommendationType.toLowerCase()
+    );
+    
+    if (targetChild) {
+      recommendationTypeInstructions = `
+INDIVIDUAL CHILD RECOMMENDATION FOCUS:
+- PRIORITY: Personalized activities specifically for ${targetChild.name} (age ${targetChild.age})
+- Age-specific programs: Perfectly suited for ${targetChild.age}-year-olds
+- Interest alignment: Strong match for ${targetChild.name}'s interests: ${targetChild.interests.join(', ')}
+- Peer interaction: Opportunities to meet children of similar age and interests
+- Individual growth: Skills development tailored to ${targetChild.name}'s developmental stage
+${targetChild.specialNeeds ? `- Special accommodations: Consider ${targetChild.specialNeeds}` : ''}`;
+
+      recommendationFocus = `Focus on activities specifically tailored for ${targetChild.name} (age ${targetChild.age}) with interests in ${targetChild.interests.join(', ')}. Prioritize age-appropriate and interest-aligned programs.`;
+    }
+  }
+
+  if (!recommendationTypeInstructions) {
+    // Default to general recommendations
+    recommendationTypeInstructions = `
+GENERAL RECOMMENDATION FOCUS:
+- Consider all family members and their individual needs
+- Provide a diverse mix of family, group, and individual activities
+- Balance different age groups and interests within the family`;
+
+    recommendationFocus = 'Provide a balanced mix of activities suitable for different family members and situations.';
+  }
 
   return {
     system: `You are an expert activity recommendation engine for Austin-area families using Recess. Your job is to analyze vector search results and provide intelligent, personalized recommendations based on Austin's unique family activity landscape.

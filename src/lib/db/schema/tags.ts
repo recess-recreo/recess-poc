@@ -29,15 +29,14 @@ export const tagTable = pgTable('tag', {
  * WHY: Tags have many-to-many relationships with:
  * - Providers: To categorize services offered
  * - Children: To track interests and preferences
+ * 
+ * NOTE: Junction tables need to be created for many-to-many relationships
  */
-export const tagRelations = relations(tagTable, ({ many }) => ({
-  providers: many(providerTagTable),
-  children: many(childTagTable),
-}));
-
-// Import junction tables
-import { providerTagTable } from './providers';
-import { childTagTable } from './children';
+// TODO: Define junction tables and uncomment when ready
+// export const tagRelations = relations(tagTable, ({ many }) => ({
+//   providers: many(providerTagTable),
+//   children: many(childTagTable),
+// }));
 
 // Type exports
 export type Tag = typeof tagTable.$inferSelect;

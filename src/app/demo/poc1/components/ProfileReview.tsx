@@ -1,12 +1,14 @@
 /**
  * Profile Review Component - Phase 2
  * 
- * WHY: Editable structured profile because:
+ * WHY: Editable structured profile with family member perspective filtering because:
  * - Shows the power of AI extraction from natural language
  * - Allows users to verify and refine AI-parsed information
  * - Demonstrates data quality and accuracy of AI processing
  * - Provides confidence that the system understands their needs
  * - Creates trust through transparency and control over their data
+ * - Enables perspective switching to view profile from different family member viewpoints
+ * - Highlights relevant sections based on selected family member (All, Family, All Kids, Individual)
  */
 
 'use client';
@@ -27,10 +29,12 @@ import {
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import type { FamilyProfile } from '@/types/ai';
 
+export type RecommendationType = 'family' | 'all_kids' | string; // string for individual child names
+
 interface ProfileReviewProps {
   familyProfile: FamilyProfile;
   originalDescription: string;
-  onComplete: (profile: FamilyProfile) => void;
+  onComplete: (profile: FamilyProfile, recommendationType: RecommendationType, requestData?: any) => void;
   loading?: boolean;
   className?: string;
 }
@@ -47,6 +51,70 @@ export default function ProfileReview({
   const [warnings] = useState<string[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<any>(null);
+
+  // Helper function to transform family profile to new request format
+  const createNewFormatRequest = (profile: FamilyProfile, targetPeople: 'family' | 'all_kids' | string) => {
+    const people = [];
+    
+    // Add adults for family recommendations
+    if (targetPeople === 'family') {
+      profile.adults.forEach(adult => {
+        people.push({
+          type: 'parent' as const,
+          name: adult.name,
+          age: 35, // Default adult age
+          interests: []
+        });
+      });
+    }
+    
+    // Add children based on target
+    if (targetPeople === 'family' || targetPeople === 'all_kids') {
+      // Add all children
+      profile.children.forEach(child => {
+        people.push({
+          type: 'child' as const,
+          name: child.name,
+          age: child.age,
+          interests: child.interests
+        });
+      });
+    } else if (targetPeople !== 'family' && targetPeople !== 'all_kids') {
+      // Add specific child
+      const targetChild = profile.children.find(c => 
+        c.name.toLowerCase() === targetPeople.toLowerCase()
+      );
+      if (targetChild) {
+        people.push({
+          type: 'child' as const,
+          name: targetChild.name,
+          age: targetChild.age,
+          interests: targetChild.interests
+        });
+      }
+    }
+    
+    return {
+      people,
+      location: {
+        city: profile.location.city || 'Austin',
+        neighborhood: profile.location.neighborhood,
+        postalCode: profile.location.zipCode
+      },
+      budget: {
+        amount: profile.preferences?.budget?.max || 200,
+        period: 'month' as const
+      },
+      schedule: {
+        preferences: profile.preferences?.schedule || []
+      }
+    };
+  };
+
+  const handleRecommendationClick = (recommendationType: RecommendationType) => {
+    const newFormatData = createNewFormatRequest(editingProfile, recommendationType);
+    onComplete(editingProfile, recommendationType, newFormatData);
+  };
 
   const handleFieldEdit = (fieldPath: string, currentValue: any) => {
     setEditingField(fieldPath);
@@ -228,6 +296,7 @@ export default function ProfileReview({
         </div>
       )}
 
+
       {/* Profile Sections */}
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Adults Section */}
@@ -327,7 +396,10 @@ export default function ProfileReview({
 
         <div className="space-y-4">
           {editingProfile.children.map((child, index) => (
-            <div key={index} className="p-4 bg-neutral-5 rounded-lg">
+            <div 
+              key={index} 
+              className="p-4 bg-neutral-5 rounded-lg"
+            >
               <div className="flex items-start justify-between mb-3">
                 <div className="grid grid-cols-2 gap-4 flex-1">
                   <div>
@@ -485,26 +557,148 @@ export default function ProfileReview({
         </p>
       </div>
 
-      {/* Continue Button */}
-      <div className="text-center">
-        <button
-          onClick={() => onComplete(editingProfile)}
-          disabled={loading}
-          className={`px-8 py-4 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl ${
-            loading 
-              ? 'bg-neutral-30 text-neutral-50 cursor-not-allowed'
-              : 'bg-primary hover:bg-tertiary-night text-neutral-0'
-          }`}
-        >
-          {loading ? (
-            <>
-              <div className="w-5 h-5 border-2 border-neutral-0/30 border-t-neutral-0 rounded-full animate-spin inline-block mr-2" />
-              Getting AI Recommendations...
-            </>
-          ) : (
-            'Continue to AI Recommendations'
+      {/* Recommendation Query Buttons */}
+      <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-xl border border-primary/20 p-6">
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <SparklesIcon className="w-6 h-6 text-primary" />
+            <h3 className="text-xl font-semibold text-neutral-100">Get AI Recommendations</h3>
+          </div>
+          <p className="text-neutral-60 text-sm">
+            Choose what type of recommendations you'd like to receive:
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Family Recommendations */}
+          <button
+            onClick={() => handleRecommendationClick('family')}
+            disabled={loading}
+            className={`p-4 rounded-lg text-left transition-all duration-200 border-2 group ${
+              loading 
+                ? 'bg-neutral-10 text-neutral-50 cursor-not-allowed border-neutral-20'
+                : 'bg-secondary/10 hover:bg-secondary/20 text-secondary border-secondary/30 hover:border-secondary/50 shadow-sm hover:shadow-md'
+            }`}
+          >
+            <div className="flex items-center space-x-3 mb-2">
+              <UserGroupIcon className={`w-6 h-6 flex-shrink-0 ${
+                loading ? 'text-neutral-40' : 'text-secondary group-hover:text-secondary/80'
+              }`} />
+              <h4 className="font-semibold text-base">
+                {loading ? 'Getting Recommendations...' : 'Family Activities'}
+              </h4>
+            </div>
+            <p className={`text-sm ${
+              loading ? 'text-neutral-40' : 'text-secondary/80'
+            }`}>
+              Activities that work for the whole family including adults and all children
+            </p>
+            {loading && (
+              <div className="flex items-center space-x-2 mt-3">
+                <div className="w-4 h-4 border-2 border-neutral-30 border-t-neutral-60 rounded-full animate-spin" />
+                <span className="text-xs text-neutral-50">Processing...</span>
+              </div>
+            )}
+          </button>
+
+          {/* All Kids Recommendations - Only show if multiple children */}
+          {editingProfile.children.length > 1 && (
+            <button
+              onClick={() => handleRecommendationClick('all_kids')}
+              disabled={loading}
+              className={`p-4 rounded-lg text-left transition-all duration-200 border-2 group ${
+                loading 
+                  ? 'bg-neutral-10 text-neutral-50 cursor-not-allowed border-neutral-20'
+                  : 'bg-tertiary-orange/10 hover:bg-tertiary-orange/20 text-tertiary-orange border-tertiary-orange/30 hover:border-tertiary-orange/50 shadow-sm hover:shadow-md'
+              }`}
+            >
+              <div className="flex items-center space-x-3 mb-2">
+                <UserGroupIcon className={`w-6 h-6 flex-shrink-0 ${
+                  loading ? 'text-neutral-40' : 'text-tertiary-orange group-hover:text-tertiary-orange/80'
+                }`} />
+                <h4 className="font-semibold text-base">
+                  {loading ? 'Getting Recommendations...' : 'All Children Together'}
+                </h4>
+              </div>
+              <p className={`text-sm ${
+                loading ? 'text-neutral-40' : 'text-tertiary-orange/80'
+              }`}>
+                Activities that all children can participate in together
+              </p>
+              {loading && (
+                <div className="flex items-center space-x-2 mt-3">
+                  <div className="w-4 h-4 border-2 border-neutral-30 border-t-neutral-60 rounded-full animate-spin" />
+                  <span className="text-xs text-neutral-50">Processing...</span>
+                </div>
+              )}
+            </button>
           )}
-        </button>
+
+          {/* Individual Child Recommendations */}
+          {editingProfile.children.map((child, index) => (
+            <button
+              key={index}
+              onClick={() => handleRecommendationClick(child.name.toLowerCase())}
+              disabled={loading}
+              className={`p-4 rounded-lg text-left transition-all duration-200 border-2 group ${
+                loading 
+                  ? 'bg-neutral-10 text-neutral-50 cursor-not-allowed border-neutral-20'
+                  : 'bg-tertiary-pink/10 hover:bg-tertiary-pink/20 text-tertiary-pink border-tertiary-pink/30 hover:border-tertiary-pink/50 shadow-sm hover:shadow-md'
+              }`}
+            >
+              <div className="flex items-center space-x-3 mb-2">
+                <UserGroupIcon className={`w-6 h-6 flex-shrink-0 ${
+                  loading ? 'text-neutral-40' : 'text-tertiary-pink group-hover:text-tertiary-pink/80'
+                }`} />
+                <h4 className="font-semibold text-base">
+                  {loading ? 'Getting Recommendations...' : `${child.name}'s Activities`}
+                </h4>
+              </div>
+              <p className={`text-sm mb-2 ${
+                loading ? 'text-neutral-40' : 'text-tertiary-pink/80'
+              }`}>
+                Personalized activities for {child.name} (age {child.age})
+              </p>
+              {child.interests.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {child.interests.slice(0, 3).map((interest, idx) => (
+                    <span 
+                      key={idx} 
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        loading 
+                          ? 'bg-neutral-20 text-neutral-40'
+                          : 'bg-tertiary-pink/20 text-tertiary-pink/90'
+                      }`}
+                    >
+                      {interest}
+                    </span>
+                  ))}
+                  {child.interests.length > 3 && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      loading 
+                        ? 'bg-neutral-20 text-neutral-40'
+                        : 'bg-tertiary-pink/20 text-tertiary-pink/90'
+                    }`}>
+                      +{child.interests.length - 3} more
+                    </span>
+                  )}
+                </div>
+              )}
+              {loading && (
+                <div className="flex items-center space-x-2 mt-3">
+                  <div className="w-4 h-4 border-2 border-neutral-30 border-t-neutral-60 rounded-full animate-spin" />
+                  <span className="text-xs text-neutral-50">Processing...</span>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 text-center">
+          <p className="text-xs text-neutral-50">
+            Each recommendation type uses different AI prompts to provide targeted suggestions
+          </p>
+        </div>
       </div>
     </div>
   );

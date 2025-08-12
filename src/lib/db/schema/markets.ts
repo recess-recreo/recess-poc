@@ -1,4 +1,4 @@
-import { pgTable, integer, varchar, numeric, serial, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, integer, varchar, numeric, serial, timestamp, text, boolean } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 /**
@@ -19,13 +19,17 @@ import { relations } from 'drizzle-orm';
  * instead of coordinates and URL slugs.
  */
 export const marketTable = pgTable('market', {
-  id: serial('id').primaryKey(),
+  id: varchar('id').primaryKey(),
   name: varchar('name').notNull(),
-  municipality: varchar('municipality').notNull(),
-  administrativeArea: varchar('administrative_area', { length: 2 }).notNull(),
-  country: varchar('country', { length: 2 }).notNull(),
+  slug: varchar('slug').notNull(),
+  description: text('description'),
+  city: varchar('city'),
+  state: varchar('state'),
+  latitude: numeric('latitude', { precision: 10, scale: 8 }),
+  longitude: numeric('longitude', { precision: 11, scale: 8 }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  active: boolean('active').default(true),
 });
 
 /**

@@ -29,10 +29,19 @@ import { getAIClient, createAICacheKey } from './openai-client';
 import { getLocalEmbeddingsClient, createLocalEmbeddingCacheKey } from '@/lib/embeddings/local-embeddings-client';
 import { createQdrantClient, QdrantClient, QdrantSearchResult } from '@/lib/embeddings/qdrant-client';
 import { FamilyProfile } from '@/types/ai';
+import { 
+  getRecommendationProviders, 
+  extractUniqueIds,
+  type RecommendationProvider 
+} from '@/lib/db/queries/providers';
+import { 
+  LightweightRecommendation, 
+  LightweightRecommendationResult 
+} from '@/types/ai';
 
 export interface ActivityMetadata {
-  providerId: number;
-  programId?: number;
+  providerId: string;
+  programId?: string;
   name: string;
   description: string;
   category: string;
@@ -96,8 +105,8 @@ export interface RecommendationFilters {
 }
 
 export interface ScoredRecommendation {
-  providerId: number;
-  programId?: number;
+  providerId: string;
+  programId?: string;
   matchScore: number; // 0-1
   vectorSimilarity: number; // 0-1 from Qdrant
   practicalScore: number; // 0-1 from practical factors
@@ -159,6 +168,7 @@ export class RecommendationEngine {
       diversityWeight?: number; // 0-1, higher = more diverse results
       filters?: RecommendationFilters;
       cacheResults?: boolean;
+      recommendationType?: string; // 'family', 'all_kids', or child name
     } = {}
   ): Promise<RecommendationResult> {
     const startTime = Date.now();
@@ -168,13 +178,14 @@ export class RecommendationEngine {
       diversityWeight = 0.3,
       filters = {},
       cacheResults = true,
+      recommendationType,
     } = options;
 
     try {
       // 1. Generate search query and embedding
       const { searchQuery, embedding, cacheHit: embeddingCacheHit } = await this.generateSearchEmbedding(
         familyProfile,
-        { useCache: cacheResults }
+        { useCache: cacheResults, recommendationType }
       );
 
       // 2. Perform vector similarity search
@@ -197,23 +208,51 @@ export class RecommendationEngine {
       }
       console.log(`Embedding validation passed: ${embedding.length} dimensions, sample values: [${embedding.slice(0, 3).map(v => v.toFixed(4)).join(', ')}, ..., ${embedding.slice(-3).map(v => v.toFixed(4)).join(', ')}]`);
       
-      const vectorResults = await this.performVectorSearch(
-        embedding,
-        { limit: limit * 3, filters } // Get more results for better filtering
-      );
+      // Add timeout protection to vector search
+      const vectorResults = await Promise.race([
+        this.performVectorSearch(
+          embedding,
+          { limit: Math.floor(Math.min(limit * 2, 50)), filters } // Ensure limit is always an integer for Qdrant
+        ),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Vector search timeout: Qdrant search exceeded 5 seconds')), 5000)
+        )
+      ]);
       const vectorSearchMs = Date.now() - vectorStartTime;
 
-      // 3. Apply practical filters and scoring
+      // 3. Extract unique provider/event IDs from vector results
+      const { providerIds, eventIds } = extractUniqueIds(vectorResults);
+      console.log(`Vector search found ${providerIds.length} unique providers and ${eventIds.length} events`);
+
+      // 4. Query database for actual provider data
+      const databaseStartTime = Date.now();
+      
+      // Check if we need to limit provider IDs to prevent timeout
+      const elapsedSoFar = Date.now() - startTime;
+      if (elapsedSoFar > 4000) {
+        console.warn(`Time budget exceeded after vector search (${elapsedSoFar}ms). Limiting provider query scope.`);
+        providerIds.splice(20); // Limit to first 20 providers
+      }
+      
+      const databaseProviders = await getRecommendationProviders(
+        providerIds, 
+        eventIds.length > 0 ? eventIds.slice(0, 50) : undefined // Limit events too
+      );
+      const databaseMs = Date.now() - databaseStartTime;
+      console.log(`Database query completed in ${databaseMs}ms, found ${databaseProviders.length} providers`);
+
+      // 5. Apply practical filters and scoring using database data
       const scoringStartTime = Date.now();
-      const scoredRecommendations = await this.scoreAndRankRecommendations(
+      const scoredRecommendations = await this.scoreAndRankDatabaseRecommendations(
+        databaseProviders,
         vectorResults,
         familyProfile,
         filters,
-        { includeScore, diversityWeight }
+        { includeScore, diversityWeight, recommendationType }
       );
       const scoringMs = Date.now() - scoringStartTime;
 
-      // 4. Select final recommendations
+      // 6. Select final recommendations
       const finalRecommendations = this.selectDiverseRecommendations(
         scoredRecommendations,
         limit,
@@ -253,15 +292,120 @@ export class RecommendationEngine {
   }
 
   /**
+   * Generate lightweight activity recommendations with only IDs and scores.
+   * 
+   * WHY: Lightweight recommendations to prevent duplicates because:
+   * - Vector search returns many similar activities from same providers
+   * - Full metadata creates bloated responses with duplicate information
+   * - API route needs to deduplicate IDs before fetching full provider data
+   * - Separation of concerns: engine finds matches, API route handles data enrichment
+   * - Reduces memory usage and network overhead for large result sets
+   * 
+   * This method returns only provider IDs, event IDs, and scores, allowing the
+   * API route to deduplicate and batch-fetch full data efficiently.
+   */
+  async generateLightweightRecommendations(
+    familyProfile: FamilyProfile,
+    options: {
+      limit?: number;
+      includeScore?: boolean;
+      diversityWeight?: number; // 0-1, higher = more diverse results
+      filters?: RecommendationFilters;
+      cacheResults?: boolean;
+      recommendationType?: string; // 'family', 'all_kids', or child name
+    } = {}
+  ): Promise<LightweightRecommendationResult> {
+    const startTime = Date.now();
+    const {
+      limit = 20,
+      includeScore = true,
+      diversityWeight = 0.3,
+      filters = {},
+      cacheResults = true,
+      recommendationType,
+    } = options;
+
+    try {
+      // 1. Generate search query and embedding
+      const { searchQuery, embedding, cacheHit: embeddingCacheHit } = await this.generateSearchEmbedding(
+        familyProfile,
+        { useCache: cacheResults, recommendationType }
+      );
+
+      // 2. Perform vector similarity search
+      const vectorStartTime = Date.now();
+      
+      // Add timeout protection to vector search
+      const vectorResults = await Promise.race([
+        this.performVectorSearch(
+          embedding,
+          { limit: Math.floor(Math.min(limit * 2, 50)), filters } // Get extra for diversity
+        ),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Vector search timeout: Qdrant search exceeded 5 seconds')), 5000)
+        )
+      ]);
+      const vectorSearchMs = Date.now() - vectorStartTime;
+
+      // 3. Score and rank using only vector data (no database queries)
+      const scoringStartTime = Date.now();
+      const lightweightRecommendations = this.scoreLightweightRecommendations(
+        vectorResults,
+        familyProfile,
+        filters,
+        { diversityWeight, recommendationType }
+      );
+      const scoringMs = Date.now() - scoringStartTime;
+
+      // 4. Select final recommendations with diversity
+      const finalRecommendations = this.selectDiverseLightweightRecommendations(
+        lightweightRecommendations,
+        limit,
+        diversityWeight
+      );
+
+      const totalMs = Date.now() - startTime;
+
+      const result: LightweightRecommendationResult = {
+        recommendations: finalRecommendations,
+        searchMetadata: {
+          totalMatches: lightweightRecommendations.length,
+          vectorSearchResults: vectorResults.length,
+          filtersApplied: this.getAppliedFilters(filters),
+          searchQuery,
+          embedding: includeScore ? embedding : undefined,
+        },
+        performance: {
+          vectorSearchMs,
+          scoringMs,
+          totalMs,
+          cacheHit: embeddingCacheHit,
+        },
+      };
+
+      // 5. Cache results if enabled
+      if (cacheResults) {
+        await this.cacheLightweightRecommendations(familyProfile, filters, result);
+      }
+
+      return result;
+
+    } catch (error) {
+      console.error('Lightweight recommendation generation failed:', error);
+      throw new Error(`Failed to generate lightweight recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Generate search embedding from family profile.
    * Uses local embeddings with OpenAI fallback for reliability.
    */
   private async generateSearchEmbedding(
     familyProfile: FamilyProfile,
-    options: { useCache?: boolean } = {}
+    options: { useCache?: boolean; recommendationType?: string } = {}
   ): Promise<{ searchQuery: string; embedding: number[]; cacheHit: boolean }> {
     // Build search query from family profile
-    const searchQuery = this.buildSearchQuery(familyProfile);
+    const searchQuery = this.buildSearchQuery(familyProfile, options.recommendationType);
 
     let cacheKey: string | undefined;
     let cacheHit = false;
@@ -325,17 +469,33 @@ export class RecommendationEngine {
 
   /**
    * Build search query text from family profile.
+   * 
+   * WHY: Enhanced search query building with recommendation type filtering because:
+   * - When recommendationType specifies a child, should focus search on that child only
+   * - Family activities should include all children for broader matching
+   * - Specific child queries need more targeted age and interest matching
+   * - Improves relevance of vector search results
    */
-  private buildSearchQuery(familyProfile: FamilyProfile): string {
+  private buildSearchQuery(familyProfile: FamilyProfile, recommendationType?: string): string {
     const parts: string[] = [];
 
-    // Children information
-    const childrenDesc = familyProfile.children.map(child => {
-      const interests = child.interests.length > 0 ? ` interested in ${child.interests.join(', ')}` : '';
-      const special = child.specialNeeds ? ` with special needs: ${child.specialNeeds}` : '';
-      return `${child.age}-year-old ${child.name}${interests}${special}`;
-    }).join('; ');
-    parts.push(`Family with children: ${childrenDesc}`);
+    // Get relevant children based on recommendation type
+    const relevantChildren = this.getRelevantChildren(familyProfile, recommendationType);
+
+    // Children information - use only relevant children
+    if (relevantChildren.length > 0) {
+      const childrenDesc = relevantChildren.map(child => {
+        const interests = child.interests.length > 0 ? ` interested in ${child.interests.join(', ')}` : '';
+        const special = child.specialNeeds ? ` with special needs: ${child.specialNeeds}` : '';
+        return `${child.age}-year-old ${child.name}${interests}${special}`;
+      }).join('; ');
+      
+      if (relevantChildren.length === 1 && recommendationType && recommendationType !== 'family' && recommendationType !== 'all_kids') {
+        parts.push(`Activities for ${childrenDesc}`);
+      } else {
+        parts.push(`Family with children: ${childrenDesc}`);
+      }
+    }
 
     // Location
     const location = [
@@ -398,6 +558,9 @@ export class RecommendationEngine {
     options: { limit: number; filters: RecommendationFilters }
   ): Promise<Array<QdrantSearchResult & { metadata: ActivityMetadata }>> {
     const { limit, filters } = options;
+    
+    // Ensure limit is always an integer for Qdrant API
+    const integerLimit = Math.floor(Math.max(1, limit));
 
     // Build Qdrant filter object
     // const qdrantFilter = this.buildQdrantFilter(filters);
@@ -407,7 +570,7 @@ export class RecommendationEngine {
     const searchResults = await this.qdrantClient.search({
       collection_name: this.collectionName,
       vector: queryEmbedding,
-      limit,
+      limit: integerLimit,
       score_threshold: 0.1, // Minimum similarity threshold
       filter: qdrantFilter,
       with_payload: true,
@@ -482,121 +645,259 @@ export class RecommendationEngine {
     return conditions.length > 0 ? { bool: { must: conditions } } : undefined;
   }
 
+  // NOTE: Old scoreAndRankRecommendations method removed in favor of scoreAndRankDatabaseRecommendations
+  // which uses the improved database-driven approach to eliminate duplicates at source
+
   /**
-   * Score and rank recommendations based on multiple factors.
+   * Score and rank recommendations based on database provider data.
+   * 
+   * WHY: Database-driven scoring approach because:
+   * - Vector search identifies relevant providers, database provides complete data
+   * - Eliminates duplicates at source (unique providers from database)
+   * - Uses real provider/program data for accurate scoring
+   * - Maintains vector similarity scores for relevance weighting
+   * - Properly handles recommendation type filtering for specific children
    */
-  private async scoreAndRankRecommendations(
-    vectorResults: Array<QdrantSearchResult & { metadata: ActivityMetadata }>,
+  private async scoreAndRankDatabaseRecommendations(
+    databaseProviders: RecommendationProvider[],
+    vectorResults: Array<QdrantSearchResult & { metadata: any }>,
     familyProfile: FamilyProfile,
     filters: RecommendationFilters,
-    options: { includeScore: boolean; diversityWeight: number }
+    options: { includeScore: boolean; diversityWeight: number; recommendationType?: string }
   ): Promise<ScoredRecommendation[]> {
     const scoredRecommendations: ScoredRecommendation[] = [];
-
+    
+    // Create a map of vector scores for quick lookup
+    const vectorScores = new Map<string, number>();
     for (const result of vectorResults) {
       const metadata = result.metadata;
       
-      // Calculate various scoring factors - handle missing/different metadata structure
-      const ageScore = this.calculateAgeScore(
-        this.extractAgeRangeFromMetadata(metadata), 
-        familyProfile.children
-      );
-      const interestScore = this.calculateInterestScore(
-        this.extractInterestsFromMetadata(metadata), 
-        familyProfile
-      );
-      const locationScore = this.calculateLocationScore(
-        this.extractLocationFromMetadata(metadata), 
-        familyProfile.location
-      );
-      const scheduleScore = this.calculateScheduleScore(
-        this.extractScheduleFromMetadata(metadata), 
-        familyProfile.preferences?.schedule
-      );
-      const budgetScore = this.calculateBudgetScore(
-        this.extractPricingFromMetadata(metadata), 
-        familyProfile.preferences?.budget
-      );
-      const qualityScore = this.calculateQualityScore(
-        this.extractProviderFromMetadata(metadata)
-      );
+      // Extract provider ID from various metadata formats and convert to database format
+      const rawProviderId = metadata.provider_id || metadata.providerId || '';
+      const providerId = this.convertToProviderDbId(rawProviderId) || '';
+      
+      // Extract program/camp ID if available - camp_id can be the program ID
+      const rawCampId = metadata.camp_id || 0;
+      const rawProgramId = metadata.programId || rawCampId;
+      const programId = this.convertToEventDbId(rawProgramId) || 'default';
+      
+      // Use provider-program combination as key with proper database formats
+      const key = `${providerId}-${programId}`;
+      
+      // Keep the highest vector score for each provider-program combo
+      if (!vectorScores.has(key) || vectorScores.get(key)! < result.score) {
+        vectorScores.set(key, result.score);
+      }
+    }
 
-      // Weighted overall score
-      const weights = {
-        vector: 0.3,
-        age: 0.25,
-        interests: 0.2,
-        location: 0.1,
-        schedule: 0.1,
-        budget: 0.03,
-        quality: 0.02,
-      };
+    // Get relevant children based on recommendation type
+    const relevantChildren = this.getRelevantChildren(familyProfile, options.recommendationType);
 
-      const practicalScore = (
-        ageScore * weights.age +
-        interestScore * weights.interests +
-        locationScore * weights.location +
-        scheduleScore * weights.schedule +
-        budgetScore * weights.budget +
-        qualityScore * weights.quality
-      ) / (weights.age + weights.interests + weights.location + weights.schedule + weights.budget + weights.quality);
+    // Optimize scoring with early exit conditions and batch processing
+    const maxRecommendations = 100; // Limit processing to top candidates
+    let processedCount = 0;
+    
+    for (const provider of databaseProviders) {
+      // Early exit if we've processed enough candidates
+      if (processedCount >= maxRecommendations) {
+        console.log(`Early exit: processed ${processedCount} candidates to optimize performance`);
+        break;
+      }
 
-      const matchScore = (result.score * weights.vector + practicalScore * (1 - weights.vector));
-
-      // Generate match reasons and concerns
-      const { matchReasons, concerns } = this.generateMatchExplanation(
-        metadata,
-        familyProfile,
-        { ageScore, interestScore, locationScore, scheduleScore, budgetScore, qualityScore }
-      );
-
-      // Skip if score is too low
-      if (matchScore < 0.2) continue;
-
-      // Create a normalized metadata structure for compatibility
-      const normalizedMetadata: ActivityMetadata = {
-        providerId: parseInt((metadata as any).provider_id) || parseInt((metadata as any).camp_id) || 0,
-        programId: (metadata as any).camp_id ? parseInt((metadata as any).camp_id) : undefined,
-        name: (metadata as any).provider_name || (metadata as any).company_name || (metadata as any).title || 'Unknown',
-        description: (metadata as any).text || '',
-        category: (metadata as any).category || 'General',
-        subcategory: undefined,
-        interests: this.extractInterestsFromMetadata(metadata),
-        ageRange: this.extractAgeRangeFromMetadata(metadata) || { min: 0, max: 18 },
-        location: this.extractLocationFromMetadata(metadata),
-        schedule: this.extractScheduleFromMetadata(metadata),
-        pricing: this.extractPricingFromMetadata(metadata),
-        provider: this.extractProviderFromMetadata(metadata),
-        capacity: {},
-        requirements: undefined,
-        tags: [(metadata as any).type || 'activity'],
-        createdAt: new Date((metadata as any).created_at || Date.now()),
-        updatedAt: new Date((metadata as any).updated_at || Date.now()),
-      };
-
-      scoredRecommendations.push({
-        providerId: normalizedMetadata.providerId,
-        programId: normalizedMetadata.programId,
-        matchScore,
-        vectorSimilarity: result.score,
-        practicalScore,
-        matchReasons,
-        concerns,
-        metadata: normalizedMetadata,
-        ranking: {
-          overall: matchScore,
-          age: ageScore,
-          interests: interestScore,
-          location: locationScore,
-          schedule: scheduleScore,
-          budget: budgetScore,
-          quality: qualityScore,
-        },
-      });
+      // Handle providers with events
+      if (provider.events.length > 0) {
+        // Limit events per provider to prevent excessive processing
+        const eventsToProcess = provider.events.slice(0, 5); // Max 5 events per provider
+        
+        for (const event of eventsToProcess) {
+          const key = `${provider.id}-${event.id}`;
+          const vectorSimilarity = vectorScores.get(key) || vectorScores.get(`${provider.id}-default`) || 0.5;
+          
+          // Quick relevance check before expensive scoring
+          if (vectorSimilarity < 0.3) {
+            continue; // Skip low-relevance items
+          }
+          
+          const scoredRecommendation = this.scoreProviderEvent(
+            provider, 
+            event, 
+            vectorSimilarity, 
+            familyProfile, 
+            relevantChildren, 
+            filters,
+            options.recommendationType
+          );
+          
+          if (scoredRecommendation && scoredRecommendation.matchScore >= 0.3) {
+            scoredRecommendations.push(scoredRecommendation);
+            processedCount++;
+          }
+        }
+      } else {
+        // Handle providers without specific events
+        const key = `${provider.id}-default`;
+        const vectorSimilarity = vectorScores.get(key) || 0.5;
+        
+        // Quick relevance check before expensive scoring
+        if (vectorSimilarity < 0.3) {
+          continue; // Skip low-relevance items
+        }
+        
+        const scoredRecommendation = this.scoreProviderEvent(
+          provider, 
+          null, 
+          vectorSimilarity, 
+          familyProfile, 
+          relevantChildren, 
+          filters,
+          options.recommendationType
+        );
+        
+        if (scoredRecommendation && scoredRecommendation.matchScore >= 0.3) {
+          scoredRecommendations.push(scoredRecommendation);
+          processedCount++;
+        }
+      }
     }
 
     // Sort by match score
-    return scoredRecommendations.sort((a, b) => b.matchScore - a.matchScore);
+    const finalRecommendations = scoredRecommendations.sort((a, b) => b.matchScore - a.matchScore);
+    
+    console.log(`Database scoring: ${databaseProviders.length} providers → ${finalRecommendations.length} scored recommendations`);
+    
+    return finalRecommendations;
+  }
+
+  /**
+   * Score individual provider-event combination.
+   */
+  private scoreProviderEvent(
+    provider: RecommendationProvider,
+    event: RecommendationProvider['events'][0] | null,
+    vectorSimilarity: number,
+    familyProfile: FamilyProfile,
+    relevantChildren: FamilyProfile['children'],
+    filters: RecommendationFilters,
+    recommendationType?: string
+  ): ScoredRecommendation | null {
+    // Create metadata structure from database provider data
+    const metadata: ActivityMetadata = {
+      providerId: provider.id,
+      programId: event?.id ? String(event.id) : undefined,
+      name: event?.title || provider.name,
+      description: event?.description || provider.description || '',
+      category: event?.category || 'General',
+      subcategory: undefined,
+      interests: this.inferInterestsFromEvent(event) || [],
+      ageRange: this.extractAgeRangeFromEvent(event) || this.extractAgeRangeFromProvider(provider) || { min: 3, max: 18 },
+      location: {
+        neighborhood: undefined, // No neighborhood in current schema
+        city: event?.city || provider.city || undefined,
+        zipCode: event?.zipCode || provider.zipCode || undefined,
+        address: event?.address || provider.address || undefined,
+        coordinates: event?.latitude && event?.longitude ? {
+          lat: parseFloat(event.latitude.toString()),
+          lng: parseFloat(event.longitude.toString())
+        } : (provider.latitude && provider.longitude ? {
+          lat: parseFloat(provider.latitude),
+          lng: parseFloat(provider.longitude)
+        } : undefined)
+      },
+      schedule: this.extractScheduleFromEvent(event) || { days: [], times: [], recurring: false, flexibility: 'flexible' },
+      pricing: this.extractPricingFromEvent(event, provider),
+      provider: {
+        name: provider.name,
+        rating: undefined,
+        reviewCount: undefined,
+        verified: provider.verified,
+        experience: undefined
+      },
+      capacity: {
+        maxStudents: event?.capacity || undefined,
+        currentEnrollment: event?.enrolled || undefined,
+        waitlist: false,
+      },
+      requirements: undefined,
+      tags: [event?.category].filter((tag): tag is string => Boolean(tag)),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Calculate scoring factors
+    const ageScore = this.calculateAgeScore(metadata.ageRange, relevantChildren);
+    const interestScore = this.calculateInterestScore(metadata.interests, familyProfile);
+    const locationScore = this.calculateLocationScore(metadata.location, familyProfile.location);
+    const scheduleScore = this.calculateScheduleScore(metadata.schedule, familyProfile.preferences?.schedule);
+    const budgetScore = this.calculateBudgetScore(metadata.pricing, familyProfile.preferences?.budget);
+    const qualityScore = this.calculateQualityScore(metadata.provider);
+
+    // Weighted overall score
+    const weights = {
+      vector: 0.3,
+      age: 0.25,
+      interests: 0.2,
+      location: 0.1,
+      schedule: 0.1,
+      budget: 0.03,
+      quality: 0.02,
+    };
+
+    const practicalScore = (
+      ageScore * weights.age +
+      interestScore * weights.interests +
+      locationScore * weights.location +
+      scheduleScore * weights.schedule +
+      budgetScore * weights.budget +
+      qualityScore * weights.quality
+    ) / (weights.age + weights.interests + weights.location + weights.schedule + weights.budget + weights.quality);
+
+    const matchScore = (vectorSimilarity * weights.vector + practicalScore * (1 - weights.vector));
+
+    // Skip if score is too low
+    if (matchScore < 0.2) return null;
+
+    // Generate match reasons and concerns (simplified for performance)
+    const matchReasons: string[] = [];
+    const concerns: string[] = [];
+    
+    // Only generate detailed explanations for high-scoring matches to save time
+    if (matchScore >= 0.7) {
+      const explanation = this.generateMatchExplanation(
+        metadata,
+        familyProfile,
+        { ageScore, interestScore, locationScore, scheduleScore, budgetScore, qualityScore },
+        recommendationType
+      );
+      matchReasons.push(...explanation.matchReasons);
+      concerns.push(...explanation.concerns);
+    } else {
+      // Simplified explanations for lower scores
+      if (ageScore >= 0.7) matchReasons.push('Good age fit');
+      if (interestScore >= 0.7) matchReasons.push('Matches interests');
+      if (locationScore >= 0.7) matchReasons.push('Convenient location');
+      if (ageScore < 0.3) concerns.push('Age range may not be ideal');
+      if (locationScore < 0.4) concerns.push('May require travel');
+    }
+
+    return {
+      providerId: provider.id,
+      programId: event?.id ? String(event.id) : undefined,
+      matchScore,
+      vectorSimilarity,
+      practicalScore,
+      matchReasons,
+      concerns,
+      metadata,
+      ranking: {
+        overall: matchScore,
+        age: ageScore,
+        interests: interestScore,
+        location: locationScore,
+        schedule: scheduleScore,
+        budget: budgetScore,
+        quality: qualityScore,
+      },
+    };
   }
 
   /**
@@ -616,17 +917,7 @@ export class RecommendationEngine {
    * - Text parsing: "ages 4-8", "for 6 year olds"
    */
   private extractAgeRangeFromMetadata(metadata: any): { min: number; max: number } | null {
-    // Reduced logging - only log once per session to avoid spam
-    if (Math.random() < 0.01) { // Log ~1% of age extractions for debugging
-      console.log('Sample age range extraction:', { 
-        camp_id: metadata.camp_id, 
-        type: metadata.type, 
-        grades: metadata.grades, 
-        ages: metadata.ages,
-        min_age: metadata.min_age,
-        max_age: metadata.max_age
-      });
-    }
+    // Remove debug logging to optimize performance
 
     // Method 1: Direct age fields (most reliable)
     if (metadata.min_age !== undefined && metadata.max_age !== undefined) {
@@ -679,10 +970,7 @@ export class RecommendationEngine {
       }
     }
 
-    // Only warn occasionally to reduce log spam
-    if (Math.random() < 0.05) { // Log ~5% of missing age range cases
-      console.warn('Age range missing in some provider/camp metadata - this is normal for some activities');
-    }
+    // Skip logging to optimize performance
     return null;
   }
 
@@ -1257,8 +1545,6 @@ export class RecommendationEngine {
     activityLocation: ActivityMetadata['location'],
     familyLocation: FamilyProfile['location']
   ): number {
-    // Reduced logging for location scoring
-
     // If both locations have coordinates, use distance calculation
     if (activityLocation.coordinates && this.getFamilyCoordinates(familyLocation)) {
       const familyCoords = this.getFamilyCoordinates(familyLocation)!;
@@ -1643,24 +1929,60 @@ export class RecommendationEngine {
   }
 
   /**
+   * Get relevant children based on recommendation type.
+   */
+  private getRelevantChildren(familyProfile: FamilyProfile, recommendationType?: string): FamilyProfile['children'] {
+    if (!recommendationType || recommendationType === 'family') {
+      // For family activities, include all children
+      return familyProfile.children;
+    } else if (recommendationType === 'all_kids') {
+      // For all kids activities, include all children 
+      return familyProfile.children;
+    } else {
+      // For individual child recommendations, find the specific child
+      const specificChild = familyProfile.children.find(
+        child => child.name.toLowerCase() === recommendationType.toLowerCase()
+      );
+      return specificChild ? [specificChild] : familyProfile.children;
+    }
+  }
+
+  /**
    * Generate match explanation with reasons and concerns.
    */
   private generateMatchExplanation(
     metadata: ActivityMetadata,
     familyProfile: FamilyProfile,
-    scores: Record<string, number>
+    scores: Record<string, number>,
+    recommendationType?: string
   ): { matchReasons: string[]; concerns: string[] } {
     const matchReasons: string[] = [];
     const concerns: string[] = [];
 
-    // Age appropriateness
+    // Age appropriateness - filter children based on recommendationType
     const extractedAgeRange = this.extractAgeRangeFromMetadata(metadata);
+    const relevantChildren = this.getRelevantChildren(familyProfile, recommendationType);
+    
     if (scores.ageScore >= 0.8) {
-      matchReasons.push(`Perfect age fit for ${familyProfile.children.map(c => c.name).join(' and ')}`);
+      if (relevantChildren.length === 1) {
+        matchReasons.push(`Perfect age fit for ${relevantChildren[0].name}`);
+      } else if (relevantChildren.length > 1) {
+        matchReasons.push(`Perfect age fit for ${relevantChildren.map(c => c.name).join(' and ')}`);
+      } else {
+        matchReasons.push(`Perfect age fit for family activities`);
+      }
     } else if (scores.ageScore >= 0.4) {
-      matchReasons.push(`Good age fit for some children`);
+      if (relevantChildren.length <= 1) {
+        matchReasons.push(`Good age fit`);
+      } else {
+        matchReasons.push(`Good age fit for some children`);
+      }
     } else if (scores.ageScore < 0.3 && extractedAgeRange) {
-      concerns.push(`Age range (${extractedAgeRange.min}-${extractedAgeRange.max}) may not fit all children`);
+      if (relevantChildren.length <= 1) {
+        concerns.push(`Age range (${extractedAgeRange.min}-${extractedAgeRange.max}) may not be ideal`);
+      } else {
+        concerns.push(`Age range (${extractedAgeRange.min}-${extractedAgeRange.max}) may not fit all children`);
+      }
     }
 
     // Interest alignment
@@ -1704,16 +2026,54 @@ export class RecommendationEngine {
 
   /**
    * Select diverse recommendations to avoid clustering.
+   * 
+   * WHY: Enhanced deduplication approach because:
+   * - Multiple layers of deduplication ensure no provider appears multiple times
+   * - Pre-filtering eliminates exact duplicates before selection algorithm
+   * - Diversity scoring prevents same provider with different programs
+   * - Final verification ensures absolutely no duplicates reach the frontend
    */
   private selectDiverseRecommendations(
     scored: ScoredRecommendation[],
     limit: number,
     diversityWeight: number
   ): ScoredRecommendation[] {
-    if (scored.length <= limit) return scored;
+    if (scored.length === 0) return [];
+
+    // Layer 1: Pre-filter to remove exact duplicates using provider-program key
+    const seenProviderPrograms = new Set<string>();
+    const dedupedScored = scored.filter(rec => {
+      const key = `${rec.providerId}-${rec.programId || 'default'}`;
+      if (seenProviderPrograms.has(key)) {
+        console.log(`Pre-filter deduplication: removing duplicate provider-program ${rec.metadata.provider?.name || rec.providerId} (${rec.programId || 'default'})`);
+        return false;
+      }
+      seenProviderPrograms.add(key);
+      return true;
+    });
+
+    console.log(`Deduplication: ${scored.length} → ${dedupedScored.length} after removing exact provider-program duplicates`);
+
+    // Layer 2: Ensure no provider appears twice, even with different programs
+    const seenProviders = new Set<string>();
+    const uniqueProviders = dedupedScored.filter(rec => {
+      if (seenProviders.has(rec.providerId)) {
+        console.log(`Provider deduplication: removing additional instance of provider ${rec.metadata.provider?.name || rec.providerId}`);
+        return false;
+      }
+      seenProviders.add(rec.providerId);
+      return true;
+    });
+
+    console.log(`Deduplication: ${dedupedScored.length} → ${uniqueProviders.length} after ensuring unique providers`);
+
+    // If we have few enough recommendations, return them all
+    if (uniqueProviders.length <= limit) {
+      return uniqueProviders;
+    }
 
     const selected: ScoredRecommendation[] = [];
-    const remaining = [...scored];
+    const remaining = [...uniqueProviders];
 
     // Always include the top recommendation
     if (remaining.length > 0) {
@@ -1739,11 +2099,32 @@ export class RecommendationEngine {
       selected.push(remaining.splice(bestIndex, 1)[0]);
     }
 
-    return selected;
+    // Layer 3: Final verification - ensure no duplicates in final result
+    const finalSeenProviders = new Set<string>();
+    const finalDeduped = selected.filter(rec => {
+      if (finalSeenProviders.has(rec.providerId)) {
+        console.warn(`FINAL DEDUPLICATION WARNING: removing duplicate provider ${rec.metadata.provider?.name || rec.providerId} that somehow made it to final selection`);
+        return false;
+      }
+      finalSeenProviders.add(rec.providerId);
+      return true;
+    });
+
+    if (finalDeduped.length !== selected.length) {
+      console.warn(`Final deduplication caught ${selected.length - finalDeduped.length} duplicates in final selection`);
+    }
+
+    return finalDeduped;
   }
 
   /**
    * Calculate diversity score compared to already selected recommendations.
+   * 
+   * WHY: Enhanced diversity scoring because:
+   * - Exact same provider+program combinations should be completely eliminated (score 0)
+   * - Same provider with ANY program should be completely eliminated (score 0) to prevent provider duplicates
+   * - This ensures no provider appears twice in final recommendations under any circumstances
+   * - Maintains variety across categories and neighborhoods for remaining unique providers
    */
   private calculateDiversityScore(candidate: ScoredRecommendation, selected: ScoredRecommendation[]): number {
     if (selected.length === 0) return 1;
@@ -1751,17 +2132,18 @@ export class RecommendationEngine {
     let diversityScore = 1;
 
     for (const existing of selected) {
-      // Provider diversity
+      // ANY provider match - completely eliminate (including exact provider+program matches)
       if (candidate.providerId === existing.providerId) {
-        diversityScore *= 0.3; // Strong penalty for same provider
+        console.log(`Diversity filtering: eliminating duplicate provider ${candidate.metadata.provider?.name || candidate.providerId} (existing program: ${existing.programId || 'default'}, candidate program: ${candidate.programId || 'default'})`);
+        return 0; // Complete elimination for ANY provider match
       }
 
-      // Category diversity
+      // Category diversity (only applied to different providers now)
       if (candidate.metadata.category === existing.metadata.category) {
         diversityScore *= 0.7; // Moderate penalty for same category
       }
 
-      // Location diversity
+      // Location diversity (only applied to different providers now)
       if (candidate.metadata.location.neighborhood === existing.metadata.location.neighborhood) {
         diversityScore *= 0.8; // Slight penalty for same neighborhood
       }
@@ -1877,6 +2259,582 @@ export class RecommendationEngine {
     }
 
     return status;
+  }
+
+  /**
+   * Helper methods for database-driven recommendations
+   */
+  
+  
+  /**
+   * Infer age range from provider (simplified - no tags available in current schema).
+   */
+  private inferAgeRangeFromProvider(provider: RecommendationProvider): { min: number; max: number } | null {
+    // Default ranges based on provider name patterns
+    const name = provider.name.toLowerCase();
+    
+    if (name.includes('preschool') || name.includes('toddler')) {
+      return { min: 2, max: 5 };
+    }
+    if (name.includes('elementary') || name.includes('kids')) {
+      return { min: 6, max: 12 };
+    }
+    if (name.includes('teen') || name.includes('youth')) {
+      return { min: 13, max: 17 };
+    }
+    
+    // Default ranges based on common provider types
+    const description = provider.description?.toLowerCase() || '';
+    if (description.includes('preschool') || description.includes('toddler')) {
+      return { min: 2, max: 5 };
+    } else if (description.includes('elementary') || description.includes('after school')) {
+      return { min: 5, max: 12 };
+    } else if (description.includes('teen') || description.includes('youth')) {
+      return { min: 12, max: 18 };
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Build formatted address from provider data.
+   */
+  private buildProviderAddress(provider: RecommendationProvider): string {
+    const parts = [
+      provider.address,
+      provider.city,
+      provider.state,
+      provider.zipCode
+    ].filter(Boolean);
+    
+    return parts.join(', ');
+  }
+  
+  // Note: Removed unused methods that referenced non-existent properties
+  // The new lightweight architecture doesn't need these helper methods
+
+  /**
+   * Extract age range from event data.
+   * 
+   * WHY: Age ranges are critical for matching activities to children:
+   * - Database fields (minAge/maxAge) provide explicit ranges when available
+   * - Event titles often contain age info like "Teen Martial Arts (Age 13-17)"
+   * - Descriptions may have age details that database fields miss
+   * - Category-based inference handles common patterns (teen, toddler, preschool)
+   * 
+   * DESIGN DECISION: Multi-layer approach ensures we don't default to 0-18:
+   * 1. Check ages field from eventsTable schema first (most reliable when available)
+   * 2. Check explicit minAge/maxAge fields from eventTable schema  
+   * 3. Parse title and description text for age patterns
+   * 4. Infer from category keywords as fallback
+   * 5. Only return null if no age info found anywhere
+   * 
+   * @param event Event data with potential age information
+   * @returns Age range object or null if no age info available
+   */
+  private extractAgeRangeFromEvent(event: RecommendationProvider['events'][0] | null): { min: number; max: number } | null {
+    if (!event) return null;
+    
+    // 1. First check explicit database fields (most reliable when available)
+    if (event.minAge !== null && event.maxAge !== null) {
+      return { min: event.minAge, max: event.maxAge };
+    }
+    
+    // 2. Parse age from event title using existing parseAgesFromText method
+    if (event.title) {
+      const titleAge = this.parseAgesFromText(event.title);
+      if (titleAge) {
+        return titleAge;
+      }
+    }
+    
+    // 3. Parse age from event description using existing parseAgesFromText method
+    if (event.description) {
+      const descriptionAge = this.parseAgesFromText(event.description);
+      if (descriptionAge) {
+        return descriptionAge;
+      }
+    }
+    
+    // 4. Category-based inference for common age patterns
+    if (event.category) {
+      const categoryAge = this.inferAgeFromCategory(event.category);
+      if (categoryAge) {
+        return categoryAge;
+      }
+    }
+    
+    // 5. Check title and description for category keywords if explicit category didn't match
+    const combinedText = `${event.title || ''} ${event.description || ''}`.toLowerCase();
+    const textCategoryAge = this.inferAgeFromCategory(combinedText);
+    if (textCategoryAge) {
+      return textCategoryAge;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Extract age range from provider data when event data is insufficient.
+   * 
+   * WHY: When events don't have explicit age ranges, providers often include
+   * age information in their names or descriptions. This method provides a
+   * fallback to extract age ranges from provider-level data.
+   * 
+   * DESIGN DECISION: This method follows the same pattern as extractAgeRangeFromEvent
+   * but focuses on provider-specific fields (name, description) rather than event fields.
+   * 
+   * @param provider Provider data with potential age information
+   * @returns Age range object or null if no age info available
+   */
+  private extractAgeRangeFromProvider(provider: RecommendationProvider): { min: number; max: number } | null {
+    if (!provider) return null;
+    
+    // 1. Parse age from provider name using existing parseAgesFromText method
+    if (provider.name) {
+      const nameAge = this.parseAgesFromText(provider.name);
+      if (nameAge) {
+        return nameAge;
+      }
+    }
+    
+    // 2. Parse age from provider description using existing parseAgesFromText method
+    if (provider.description) {
+      const descriptionAge = this.parseAgesFromText(provider.description);
+      if (descriptionAge) {
+        return descriptionAge;
+      }
+    }
+    
+    // 3. Category-based inference for common age patterns in provider name/description
+    const combinedText = `${provider.name || ''} ${provider.description || ''}`.toLowerCase();
+    const textCategoryAge = this.inferAgeFromCategory(combinedText);
+    if (textCategoryAge) {
+      return textCategoryAge;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Infer age range from category or text containing category keywords.
+   * 
+   * WHY: Many activities use standard age-related terms without explicit ranges:
+   * - "Teen" programs typically serve 13-17 year olds
+   * - "Toddler" activities are for 1-3 year olds
+   * - "Preschool" programs serve 3-5 year olds
+   * - This provides reasonable defaults when explicit ages aren't available
+   * 
+   * @param categoryOrText Category name or text containing category keywords
+   * @returns Age range based on common category patterns or null if no match
+   */
+  private inferAgeFromCategory(categoryOrText: string): { min: number; max: number } | null {
+    if (!categoryOrText) return null;
+    
+    const text = categoryOrText.toLowerCase();
+    
+    // Infant/Baby programs
+    if (text.includes('infant') || text.includes('baby') || text.includes('newborn')) {
+      return { min: 0, max: 2 };
+    }
+    
+    // Toddler programs
+    if (text.includes('toddler')) {
+      return { min: 1, max: 3 };
+    }
+    
+    // Preschool programs
+    if (text.includes('preschool') || text.includes('pre-school') || text.includes('pre school')) {
+      return { min: 3, max: 5 };
+    }
+    
+    // Elementary/School age programs
+    if (text.includes('elementary') || text.includes('school age') || text.includes('after school')) {
+      return { min: 5, max: 12 };
+    }
+    
+    // Teen/Youth programs
+    if (text.includes('teen') || text.includes('teenager') || text.includes('youth') || text.includes('adolescent')) {
+      return { min: 13, max: 17 };
+    }
+    
+    // Adult programs
+    if (text.includes('adult') || text.includes('grown up') || text.includes('18+') || text.includes('parent')) {
+      return { min: 18, max: 99 };
+    }
+    
+    // Family programs (assume suitable for school age kids with parents)
+    if (text.includes('family') || text.includes('parent and child') || text.includes('all ages')) {
+      return { min: 5, max: 99 };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Extract schedule from event data.
+   */
+  private extractScheduleFromEvent(event: RecommendationProvider['events'][0] | null): ActivityMetadata['schedule'] | null {
+    if (!event) return null;
+    
+    const schedule: ActivityMetadata['schedule'] = {
+      days: [],
+      times: [],
+      recurring: event.recurring || false,
+      flexibility: 'fixed'
+    };
+    
+    // Infer days from event dates
+    if (event.startDate) {
+      const startDate = new Date(event.startDate);
+      const dayOfWeek = startDate.getDay();
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      schedule.days = [dayNames[dayOfWeek]];
+    }
+    
+    // Extract time info if available in title or description  
+    const timeText = event.title + ' ' + (event.description || '');
+    schedule.times = this.inferTimesFromText(timeText);
+    
+    return schedule;
+  }
+
+  /**
+   * Extract pricing from event data.
+   */
+  private extractPricingFromEvent(
+    event: RecommendationProvider['events'][0] | null,
+    provider: RecommendationProvider
+  ): ActivityMetadata['pricing'] {
+    if (event?.price !== null && event?.price !== undefined) {
+      if (parseFloat(String(event.price)) === 0) {
+        return { type: 'free' };
+      }
+      return {
+        type: 'per_session',
+        amount: parseFloat(String(event.price)),
+        currency: 'USD'
+      };
+    }
+    
+    return { type: 'per_session' };
+  }
+
+  /**
+   * Infer interests from event data.
+   */
+  private inferInterestsFromEvent(event: RecommendationProvider['events'][0] | null): string[] {
+    if (!event) return [];
+    
+    const interests: string[] = [];
+    
+    if (event.category) {
+      interests.push(event.category.toLowerCase());
+    }
+    
+    // Extract interests from title and description
+    const text = (event.title + ' ' + (event.description || '')).toLowerCase();
+    
+    // Common interest keywords
+    const interestKeywords = [
+      'art', 'music', 'dance', 'sports', 'stem', 'science', 'technology',
+      'coding', 'programming', 'reading', 'writing', 'cooking', 'theater',
+      'drama', 'swimming', 'soccer', 'basketball', 'tennis', 'martial arts',
+      'yoga', 'gymnastics', 'crafts', 'pottery', 'painting', 'drawing'
+    ];
+    
+    for (const keyword of interestKeywords) {
+      if (text.includes(keyword)) {
+        interests.push(keyword);
+      }
+    }
+    
+    return [...new Set(interests)]; // Remove duplicates
+  }
+
+  /**
+   * Convert vector search provider ID to database format.
+   * 
+   * WHY: Vector search returns various ID formats but database uses plain string IDs.
+   * This ensures compatibility between vector search results and database queries.
+   * 
+   * @param rawId Raw provider ID from vector search (numeric or string)
+   * @returns Plain string ID for database queries or null if invalid
+   */
+  private convertToProviderDbId(rawId: any): string | null {
+    if (!rawId) return null;
+    
+    // If already a string with provider prefix, remove the prefix
+    if (typeof rawId === 'string' && rawId.startsWith('provider-')) {
+      return rawId.replace('provider-', '');
+    }
+    
+    // Convert numeric ID to plain string format
+    const numericId = parseInt(String(rawId));
+    if (!isNaN(numericId) && numericId > 0) {
+      return String(numericId);
+    }
+    
+    // If it's already a plain string ID, use as-is
+    if (typeof rawId === 'string' && /^\d+$/.test(rawId)) {
+      return rawId;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Convert vector search event ID to database format.
+   * 
+   * WHY: Similar to provider IDs, event IDs may need format conversion.
+   * This handles various ID formats that might come from vector search.
+   * 
+   * @param rawId Raw event ID from vector search (numeric or string)
+   * @returns Plain string ID for database queries or null if invalid
+   */
+  private convertToEventDbId(rawId: any): string | null {
+    if (!rawId) return null;
+    
+    // If already a string with event prefix, remove the prefix  
+    if (typeof rawId === 'string' && (rawId.startsWith('event-') || rawId.startsWith('camp-'))) {
+      return rawId.replace(/^(event-|camp-)/, '');
+    }
+    
+    // Convert numeric ID to plain string format
+    const numericId = parseInt(String(rawId));
+    if (!isNaN(numericId) && numericId > 0) {
+      return String(numericId);
+    }
+    
+    // If it's already a plain string ID, use as-is
+    if (typeof rawId === 'string' && /^\d+$/.test(rawId)) {
+      return rawId;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Score lightweight recommendations using only vector search data.
+   * 
+   * WHY: Scoring without database queries because:
+   * - Avoids expensive database queries during initial scoring
+   * - Uses vector metadata to determine basic compatibility
+   * - Allows for quick filtering before database enrichment
+   * - Maintains vector similarity as primary ranking factor
+   * - Enables deduplication at the ID level before full data fetching
+   */
+  private scoreLightweightRecommendations(
+    vectorResults: Array<QdrantSearchResult & { metadata: any }>,
+    familyProfile: FamilyProfile,
+    filters: RecommendationFilters,
+    options: { diversityWeight: number; recommendationType?: string }
+  ): LightweightRecommendation[] {
+    const lightweightRecommendations: LightweightRecommendation[] = [];
+    const relevantChildren = this.getRelevantChildren(familyProfile, options.recommendationType);
+
+    for (const result of vectorResults) {
+      const metadata = result.metadata;
+      
+      // Extract and clean provider/event IDs
+      const rawProviderId = metadata.provider_id || metadata.providerId || '';
+      const providerId = this.convertToProviderDbId(rawProviderId);
+      if (!providerId) continue;
+
+      const rawEventId = metadata.camp_id || metadata.event_id || metadata.eventId;
+      const eventId = rawEventId ? this.convertToEventDbId(rawEventId) : undefined;
+      const programId = eventId; // Use event ID as program ID for consistency
+
+      // Basic age compatibility check using metadata
+      const ageRange = this.extractBasicAgeRange(metadata);
+      const ageScore = this.calculateBasicAgeScore(relevantChildren, ageRange);
+      if (ageScore < 0.3) continue; // Skip if clearly age-inappropriate
+
+      // Basic location check
+      const locationScore = this.calculateBasicLocationScore(familyProfile, metadata);
+      
+      // Basic budget check
+      const budgetScore = this.calculateBasicBudgetScore(familyProfile, metadata, filters);
+
+      // Basic interest matching
+      const interestScore = this.calculateBasicInterestScore(relevantChildren, metadata);
+
+      // Schedule compatibility (basic check)
+      const scheduleScore = 0.7; // Assume reasonable schedule compatibility for now
+
+      // Quality score from vector similarity
+      const qualityScore = result.score;
+
+      // Calculate overall scores
+      const practicalScore = (ageScore * 0.3 + locationScore * 0.25 + budgetScore * 0.2 + 
+                            interestScore * 0.15 + scheduleScore * 0.1);
+      const matchScore = (result.score * 0.4 + practicalScore * 0.6);
+
+      // Generate match reasons based on scores
+      const matchReasons: string[] = [];
+      const concerns: string[] = [];
+
+      if (ageScore >= 0.8) matchReasons.push('Age-appropriate activity');
+      if (interestScore >= 0.7) matchReasons.push('Matches child interests');
+      if (locationScore >= 0.8) matchReasons.push('Convenient location');
+      if (budgetScore >= 0.8) matchReasons.push('Within budget');
+      if (result.score >= 0.8) matchReasons.push('High relevance match');
+
+      if (ageScore < 0.5) concerns.push('Age compatibility unclear');
+      if (budgetScore < 0.5) concerns.push('Price information needed');
+      if (locationScore < 0.5) concerns.push('Location may be distant');
+
+      const lightweightRec: LightweightRecommendation = {
+        providerId,
+        programId: programId || undefined,
+        eventId: eventId || undefined,
+        vectorSimilarity: result.score,
+        practicalScore,
+        matchScore,
+        matchReasons,
+        concerns,
+        ranking: {
+          overall: matchScore,
+          age: ageScore,
+          interests: interestScore,
+          location: locationScore,
+          schedule: scheduleScore,
+          budget: budgetScore,
+          quality: qualityScore,
+        },
+      };
+
+      if (matchScore >= 0.3) { // Only include reasonable matches
+        lightweightRecommendations.push(lightweightRec);
+      }
+    }
+
+    // Sort by match score
+    return lightweightRecommendations.sort((a, b) => b.matchScore - a.matchScore);
+  }
+
+  /**
+   * Select diverse lightweight recommendations.
+   */
+  private selectDiverseLightweightRecommendations(
+    recommendations: LightweightRecommendation[],
+    limit: number,
+    diversityWeight: number
+  ): LightweightRecommendation[] {
+    // For now, simply take top recommendations
+    // TODO: Add diversity logic based on provider IDs
+    return recommendations.slice(0, limit);
+  }
+
+  /**
+   * Basic age range extraction from vector metadata.
+   */
+  private extractBasicAgeRange(metadata: any): { min: number; max: number } {
+    // Try to extract age range from metadata
+    if (metadata.age_min && metadata.age_max) {
+      return { min: metadata.age_min, max: metadata.age_max };
+    }
+    if (metadata.ageRange) {
+      return metadata.ageRange;
+    }
+    // Default age range if none specified
+    return { min: 3, max: 18 };
+  }
+
+  /**
+   * Calculate basic age compatibility score.
+   */
+  private calculateBasicAgeScore(children: FamilyProfile['children'], ageRange: { min: number; max: number }): number {
+    if (children.length === 0) return 0.5;
+
+    let compatibleChildren = 0;
+    for (const child of children) {
+      if (child.age >= ageRange.min && child.age <= ageRange.max) {
+        compatibleChildren++;
+      }
+    }
+
+    return compatibleChildren / children.length;
+  }
+
+  /**
+   * Calculate basic location score.
+   */
+  private calculateBasicLocationScore(familyProfile: FamilyProfile, metadata: any): number {
+    const familyCity = familyProfile.location?.city?.toLowerCase();
+    const familyNeighborhood = familyProfile.location?.neighborhood?.toLowerCase();
+    
+    if (!familyCity) return 0.5; // No location info to compare
+
+    const providerCity = (metadata.city || '').toLowerCase();
+    const providerNeighborhood = (metadata.neighborhood || '').toLowerCase();
+
+    if (familyNeighborhood && providerNeighborhood && familyNeighborhood === providerNeighborhood) {
+      return 1.0; // Same neighborhood
+    }
+    if (familyCity && providerCity && familyCity === providerCity) {
+      return 0.8; // Same city
+    }
+    
+    return 0.5; // Unknown/different location
+  }
+
+  /**
+   * Calculate basic budget compatibility score.
+   */
+  private calculateBasicBudgetScore(
+    familyProfile: FamilyProfile, 
+    metadata: any, 
+    filters: RecommendationFilters
+  ): number {
+    const familyBudgetMax = familyProfile.preferences?.budget?.max || filters.budgetRange?.max;
+    if (!familyBudgetMax) return 0.7; // No budget constraint
+
+    const price = metadata.price || metadata.amount;
+    if (price === 0) return 1.0; // Free activity
+    if (!price) return 0.6; // Unknown price
+
+    if (price <= familyBudgetMax) return 1.0;
+    if (price <= familyBudgetMax * 1.2) return 0.7; // Slightly over budget
+    return 0.3; // Over budget
+  }
+
+  /**
+   * Calculate basic interest matching score.
+   */
+  private calculateBasicInterestScore(children: FamilyProfile['children'], metadata: any): number {
+    const childInterests = children.flatMap(c => c.interests).map(i => i.toLowerCase());
+    if (childInterests.length === 0) return 0.6;
+
+    const activityKeywords = [
+      metadata.category,
+      metadata.subcategory,
+      metadata.title,
+      metadata.description,
+      ...(metadata.interests || []),
+      ...(metadata.tags || [])
+    ].filter(Boolean).map(k => k.toLowerCase()).join(' ');
+
+    let matchingInterests = 0;
+    for (const interest of childInterests) {
+      if (activityKeywords.includes(interest)) {
+        matchingInterests++;
+      }
+    }
+
+    return Math.min(1.0, matchingInterests / Math.max(1, childInterests.length * 0.5));
+  }
+
+  /**
+   * Cache lightweight recommendations results.
+   */
+  private async cacheLightweightRecommendations(
+    familyProfile: FamilyProfile,
+    filters: RecommendationFilters,
+    result: LightweightRecommendationResult
+  ): Promise<void> {
+    // TODO: Implement caching for lightweight recommendations
+    // For now, skip caching to keep implementation simple
   }
 
   /**

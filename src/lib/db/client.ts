@@ -26,7 +26,7 @@ const pool = new Pool(
         connectionString: process.env.DATABASE_URL,
         max: 20,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: 10000, // Increased from 2s to 10s for vector search operations
         ssl:
           process.env.DATABASE_URL.includes("amazonaws.com") ||
           process.env.NODE_ENV === "production"
@@ -43,7 +43,7 @@ const pool = new Pool(
         database: process.env.PG_DATABASE || "recess",
         max: 20,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: 10000, // Increased from 2s to 10s for vector search operations
         ssl:
           process.env.PG_HOST?.includes("amazonaws.com") ||
           process.env.NODE_ENV === "production"

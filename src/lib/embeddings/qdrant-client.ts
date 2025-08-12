@@ -200,7 +200,7 @@ export class QdrantClient {
   async search(params: QdrantSearchParams): Promise<QdrantSearchResult[]> {
     const payload: any = {
       vector: params.vector,
-      limit: params.limit,
+      limit: Math.floor(Math.max(1, params.limit)), // Ensure limit is always a positive integer for Qdrant API
       with_payload: params.with_payload ?? true,
     };
 

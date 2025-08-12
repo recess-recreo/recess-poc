@@ -24,11 +24,14 @@ import {
   StarIcon,
   AcademicCapIcon,
   BeakerIcon,
-  MusicalNoteIcon
+  MusicalNoteIcon,
+  Squares2X2Icon
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolid, FireIcon } from '@heroicons/react/24/solid';
 
 import type { FamilyProfile, Recommendation } from '@/types/ai';
+import RecommendationsMap from './MapWrapper';
+import { addMockCoordinates } from '@/utils/mockCoordinates';
 
 interface RecommendationsProps {
   familyProfile: FamilyProfile;
@@ -36,20 +39,25 @@ interface RecommendationsProps {
   onSelectionComplete: (selected: Recommendation[]) => void;
   loading?: boolean;
   className?: string;
+  recommendationType?: string;
 }
 
 // Helper function to extract provider name from recommendation data
 function getProviderDisplayName(rec: Recommendation): string {
-  // REAL DATA: Extract from interests field where provider names are stored
+  // Primary: Use provider name from metadata if available
+  if (rec.metadata?.provider?.name) {
+    return rec.metadata.provider.name;
+  }
+  
+  // Secondary: Try to extract from interests field (legacy data)
   if (rec.interests && rec.interests.length > 0) {
-    // Look for provider-like names in interests (usually company names)
+    // Look for provider-like names in interests
     const providerName = rec.interests.find(interest => {
-      // Filter out program titles and look for provider company names
       const lower = interest.toLowerCase();
       return (
         interest.length > 3 && // Not just acronyms
-        !lower.includes('camp -') && // Not program titles like "Camp - Activity Name"
-        !lower.includes('program') && // Not program names
+        !lower.includes('camp -') && // Not program titles
+        !lower.includes('program') &&
         !lower.includes('class') &&
         !lower.includes('session') &&
         (lower.includes('academy') || 
@@ -67,108 +75,173 @@ function getProviderDisplayName(rec: Recommendation): string {
     if (providerName) {
       return providerName;
     }
-    
-    // If no clear provider name found, use the first interest that looks like a company
-    const firstInterest = rec.interests[0];
-    if (firstInterest && firstInterest.length > 3) {
-      return firstInterest;
-    }
   }
   
   // Final fallback
   return `Provider ${rec.providerId}`;
 }
 
-// Helper function to get program name
+// Helper function to get program/activity name
 function getProgramDisplayName(rec: Recommendation): string {
-  // Try to extract from metadata
-  if (rec.metadata?.name && rec.metadata.name !== getProviderDisplayName(rec)) {
+  // Primary: Use activity/program name from metadata
+  if (rec.metadata?.name) {
     return rec.metadata.name;
   }
   
+  // Secondary: Use programId if available
   if (rec.programId) {
     return `Program ${rec.programId}`;
   }
   
+  // Fallback
   return 'Activity Program';
 }
 
+// Helper function to get category display
+function getCategoryDisplay(rec: Recommendation): string {
+  if (rec.metadata?.category) {
+    // Format category name nicely
+    return rec.metadata.category
+      .split('_')
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+  return 'General Activity';
+}
+
+// Helper function to get age range display
+function getAgeRangeDisplay(rec: Recommendation): string {
+  if (rec.metadata?.ageRange) {
+    const { min, max } = rec.metadata.ageRange;
+    
+    // Special cases for common ranges
+    if (min === 0 && max === 18) {
+      return 'Ages 18 and under';
+    }
+    if (min === 5 && max === 99) {
+      return 'All ages (5+)';
+    }
+    if (min === 8 && max === 99) {
+      return 'Ages 8+';
+    }
+    if (min === 18 && max === 99) {
+      return 'Adults (18+)';
+    }
+    if (min === 0 && max === 99) {
+      return 'All ages';
+    }
+    
+    // Standard age ranges
+    if (min === max) {
+      return `Age ${min}`;
+    }
+    return `Ages ${min}-${max}`;
+  }
+  return 'Age info not available';
+}
+
 // Helper function to extract location
-function getLocationDisplay(rec: Recommendation, familyLocation: FamilyProfile['location']): string {
-  // Try to get real location from metadata
+function getLocationDisplay(rec: Recommendation): string {
+  // Primary: Use location from metadata
   if (rec.metadata?.location) {
     const location = rec.metadata.location;
     const parts: string[] = [];
     
-    if (location.neighborhood) parts.push(location.neighborhood);
-    if (location.city) parts.push(location.city);
-    else if (location.municipality) parts.push(location.municipality);
+    // Build location string from available fields
+    if (location.neighborhood) {
+      parts.push(location.neighborhood);
+    }
+    if (location.city) {
+      parts.push(location.city);
+    }
+    
+    // Include zipCode if no other location info
+    if (parts.length === 0 && location.zipCode) {
+      parts.push(`Austin, TX ${location.zipCode}`);
+    }
     
     if (parts.length > 0) {
       return parts.join(', ');
     }
   }
   
-  // Fallback to family location area
-  const familyLocationParts: string[] = [];
-  if (familyLocation.city) familyLocationParts.push(familyLocation.city);
-  if (familyLocation.neighborhood) familyLocationParts.push(`near ${familyLocation.neighborhood}`);
-  
-  return familyLocationParts.length > 0 ? familyLocationParts.join(', ') : 'Austin, TX area';
+  // Fallback
+  return 'Austin, TX area';
 }
 
 // Helper function to extract pricing
-function getPriceDisplay(rec: Recommendation): { min: number; max: number } | null {
-  // Try to extract from metadata
+function getPriceDisplay(rec: Recommendation): string {
+  // Primary: Use pricing from metadata
   if (rec.metadata?.pricing) {
     const pricing = rec.metadata.pricing;
-    if (pricing.amount) {
-      return { min: pricing.amount, max: pricing.amount };
+    
+    // Free activities
+    if (pricing.type === 'free') {
+      return 'Free';
     }
+    
+    // Fixed amount
+    if (pricing.amount) {
+      const period = pricing.type?.replace('per_', '').replace('_', ' ') || 'month';
+      return `$${pricing.amount}/${period}`;
+    }
+    
+    // Price range
     if (pricing.range) {
-      return { min: pricing.range.min || 0, max: pricing.range.max || pricing.range.min || 100 };
+      const min = pricing.range.min || 0;
+      const max = pricing.range.max || pricing.range.min || 0;
+      if (min === max) {
+        return `$${min}/month`;
+      }
+      return `$${min}-${max}/month`;
     }
   }
   
-  // Return reasonable Austin market rates as fallback
-  return { min: 120, max: 200 };
+  // Fallback
+  return 'Contact for pricing';
 }
 
 // Helper function to get description
 function getActivityDescription(rec: Recommendation): string {
+  // Primary: Use description from metadata
   if (rec.metadata?.description) {
     return rec.metadata.description;
   }
   
-  // Generate description from match reasons
+  // Secondary: Generate description from match reasons
   if (rec.matchReasons.length > 0) {
     return `Activity program matching your interests: ${rec.matchReasons.slice(0, 2).join(', ')}`;
   }
   
+  // Fallback
   return 'Activity program for children';
 }
 
 // Helper function to get realistic schedule
-function getScheduleDisplay(rec: Recommendation): string[] {
-  if (rec.metadata?.schedule?.days && rec.metadata.schedule.times) {
-    const days = rec.metadata.schedule.days;
-    const times = rec.metadata.schedule.times;
-    return days.map((day: string, index: number) => `${day} ${times[index] || times[0] || 'TBD'}`);
+function getScheduleDisplay(rec: Recommendation): string {
+  // Primary: Use schedule from metadata
+  if (rec.metadata?.schedule) {
+    const schedule = rec.metadata.schedule;
+    
+    // If we have specific days and times
+    if (schedule.days && schedule.days.length > 0) {
+      const days = schedule.days.slice(0, 2).join(', ');
+      if (schedule.times && schedule.times.length > 0) {
+        return `${days} at ${schedule.times[0]}`;
+      }
+      return days;
+    }
+    
+    // Flexibility indicator
+    if (schedule.flexibility === 'very_flexible') {
+      return 'Very flexible schedule';
+    } else if (schedule.flexibility === 'flexible') {
+      return 'Flexible schedule';
+    }
   }
   
-  // Generate reasonable Austin schedule patterns based on interests
-  const interests = rec.interests || [];
-  if (interests.some(i => i.toLowerCase().includes('sport'))) {
-    return ['Saturday 9:00 AM', 'Wednesday 5:30 PM'];
-  }
-  if (interests.some(i => i.toLowerCase().includes('art'))) {
-    return ['Tuesday 4:00 PM', 'Thursday 4:00 PM'];
-  }
-  if (interests.some(i => i.toLowerCase().includes('music'))) {
-    return ['Monday 5:00 PM', 'Friday 4:30 PM'];
-  }
-  
-  return ['Weekdays after school', 'Weekend options available'];
+  // Fallback
+  return 'Schedule varies';
 }
 
 export default function Recommendations({
@@ -176,29 +249,71 @@ export default function Recommendations({
   recommendations,
   onSelectionComplete,
   loading = false,
-  className = ''
+  className = '',
+  recommendationType
 }: RecommendationsProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<'all' | 'perfect_match' | 'good_fit'>('all');
-  const [childFilter, setChildFilter] = useState<'all' | 'family' | 'all_kids' | string>('all');
   const [sortBy, setSortBy] = useState<'match_score' | 'price' | 'distance'>('match_score');
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+
+  // Helper function to get filtered family profile based on recommendation type
+  const getFilteredFamilyProfile = (profile: FamilyProfile, type?: string): FamilyProfile => {
+    if (!type || type === 'family') {
+      return profile; // Return full profile for family recommendations
+    }
+    
+    if (type === 'all_kids') {
+      // Return profile with only children, no adults
+      return {
+        ...profile,
+        adults: [],
+        children: profile.children
+      };
+    }
+    
+    // Check if it's a specific child name
+    const specificChild = profile.children.find(c => 
+      c.name.toLowerCase() === type.toLowerCase()
+    );
+    
+    if (specificChild) {
+      // Return profile with only this specific child
+      return {
+        ...profile,
+        adults: [],
+        children: [specificChild]
+      };
+    }
+    
+    // Default fallback to full profile
+    return profile;
+  };
+
+  // Get the display profile based on recommendation type
+  const displayProfile = getFilteredFamilyProfile(familyProfile, recommendationType);
 
   // Enhanced recommendations with real data extracted from AI recommendations
   const enhancedRecommendations = useMemo(() => {
-    return recommendations.map((rec, index) => ({
+    // Add mock coordinates for testing map functionality
+    const recommendationsWithCoords = addMockCoordinates(recommendations);
+    
+    return recommendationsWithCoords.map((rec, index) => ({
       ...rec,
       providerName: getProviderDisplayName(rec),
       programName: getProgramDisplayName(rec),
       description: getActivityDescription(rec),
-      // Remove fake ratings - show real data or none
+      // Use real ratings if available
       rating: rec.metadata?.provider?.rating || undefined,
       reviewCount: rec.metadata?.provider?.reviewCount || undefined,
-      priceRange: getPriceDisplay(rec),
+      price: getPriceDisplay(rec),
       schedule: getScheduleDisplay(rec),
-      location: getLocationDisplay(rec, familyProfile.location),
+      location: getLocationDisplay(rec),
+      category: getCategoryDisplay(rec),
+      ageRange: getAgeRangeDisplay(rec),
       imageUrl: "/about.jpeg" // Keep placeholder image
     }));
-  }, [recommendations, familyProfile.location]);
+  }, [recommendations]);
 
   // Filtered and sorted recommendations
   const filteredRecommendations = useMemo(() => {
@@ -209,57 +324,6 @@ export default function Recommendations({
       filtered = filtered.filter(rec => rec.recommendationType === filter);
     }
 
-    // Apply child filter (for demo purposes, we'll filter based on match reasons and interests)
-    if (childFilter !== 'all') {
-      if (childFilter === 'family') {
-        // Show activities suitable for the whole family
-        filtered = filtered.filter(rec => 
-          rec.matchReasons.some(reason => 
-            reason.toLowerCase().includes('family') || 
-            reason.toLowerCase().includes('all ages') ||
-            reason.toLowerCase().includes('parent')
-          ) ||
-          rec.interests.some(interest => 
-            interest.toLowerCase().includes('family') ||
-            interest.toLowerCase().includes('parent')
-          )
-        );
-      } else if (childFilter === 'all_kids') {
-        // Show activities suitable for all children in the family
-        filtered = filtered.filter(rec => 
-          rec.matchReasons.some(reason => 
-            reason.toLowerCase().includes('all children') ||
-            reason.toLowerCase().includes('siblings') ||
-            reason.toLowerCase().includes('group')
-          ) ||
-          rec.interests.some(interest => 
-            interest.toLowerCase().includes('group') ||
-            interest.toLowerCase().includes('team')
-          )
-        );
-      } else {
-        // Filter for specific child (childFilter contains child name)
-        const childName = childFilter.toLowerCase();
-        filtered = filtered.filter(rec => 
-          rec.matchReasons.some(reason => 
-            reason.toLowerCase().includes(childName)
-          ) ||
-          rec.interests.some(interest => 
-            // For demo, we'll show activities that match the child's implied interests
-            childName.includes('emma') ? (
-              interest.toLowerCase().includes('art') ||
-              interest.toLowerCase().includes('music') ||
-              interest.toLowerCase().includes('creative')
-            ) :
-            childName.includes('jake') ? (
-              interest.toLowerCase().includes('sport') ||
-              interest.toLowerCase().includes('active') ||
-              interest.toLowerCase().includes('physical')
-            ) : true
-          )
-        );
-      }
-    }
 
     // Apply sorting
     filtered.sort((a, b) => {
@@ -267,8 +331,8 @@ export default function Recommendations({
         case 'match_score':
           return b.matchScore - a.matchScore;
         case 'price':
-          const aPrice = a.priceRange?.min || 0;
-          const bPrice = b.priceRange?.min || 0;
+          const aPrice = a.metadata?.pricing?.amount || 0;
+          const bPrice = b.metadata?.pricing?.amount || 0;
           return aPrice - bPrice;
         case 'distance':
           // Mock distance sorting
@@ -279,9 +343,9 @@ export default function Recommendations({
     });
 
     return filtered;
-  }, [enhancedRecommendations, filter, childFilter, sortBy]);
+  }, [enhancedRecommendations, filter, sortBy]);
 
-  const handleSelection = (providerId: number, selected: boolean) => {
+  const handleSelection = (providerId: string, selected: boolean) => {
     const newSelection = new Set(selectedIds);
     if (selected) {
       newSelection.add(providerId);
@@ -352,13 +416,32 @@ export default function Recommendations({
 
       {/* Family Summary */}
       <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-xl p-4">
-        <h3 className="font-medium text-neutral-100 mb-2">Matching Profile Summary</h3>
+        <h3 className="font-medium text-neutral-100 mb-2">
+          {recommendationType === 'all_kids' ? 'Searching for All Children' :
+           recommendationType && displayProfile.children.length === 1 ? `Searching for ${displayProfile.children[0].name}` :
+           'Matching Profile Summary'}
+        </h3>
         <div className="grid md:grid-cols-3 gap-4 text-sm">
           <div className="flex items-center space-x-2">
             <UsersIcon className="w-4 h-4 text-primary" />
             <span className="text-neutral-70">
-              {familyProfile.children.length} {familyProfile.children.length === 1 ? 'child' : 'children'} 
-              ({familyProfile.children.map(c => c.age).join(', ')} years old)
+              {displayProfile.children.length === 1 ? (
+                <>
+                  1 child: {displayProfile.children[0].name} ({displayProfile.children[0].age})
+                  {displayProfile.children[0].interests && displayProfile.children[0].interests.length > 0 && (
+                    <> - {displayProfile.children[0].interests.join(', ')}</>
+                  )}
+                </>
+              ) : (
+                <>
+                  {displayProfile.children.length} children: {displayProfile.children.map(c => {
+                    const interests = c.interests && c.interests.length > 0 
+                      ? ` - ${c.interests.slice(0, 2).join(', ')}`
+                      : '';
+                    return `${c.name} (${c.age}${interests})`;
+                  }).join(', ')}
+                </>
+              )}
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -379,96 +462,32 @@ export default function Recommendations({
         </div>
       </div>
 
-      {/* Child Filter Buttons */}
-      <div className="bg-neutral-0 rounded-xl border border-neutral-20 p-4">
-        <div className="flex items-center space-x-2 mb-3">
-          <UsersIcon className="w-5 h-5 text-primary" />
-          <h4 className="font-medium text-neutral-100">Filter by family member:</h4>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setChildFilter('all')}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-              childFilter === 'all' 
-                ? 'bg-primary text-neutral-0 shadow-md' 
-                : 'bg-neutral-10 text-neutral-70 hover:bg-neutral-20'
-            }`}
-          >
-            All Activities
-          </button>
-          <button
-            onClick={() => setChildFilter('family')}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-              childFilter === 'family' 
-                ? 'bg-secondary text-neutral-0 shadow-md' 
-                : 'bg-neutral-10 text-neutral-70 hover:bg-neutral-20'
-            }`}
-          >
-            Family
-          </button>
-          <button
-            onClick={() => setChildFilter('all_kids')}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-              childFilter === 'all_kids' 
-                ? 'bg-tertiary-orange text-neutral-0 shadow-md' 
-                : 'bg-neutral-10 text-neutral-70 hover:bg-neutral-20'
-            }`}
-          >
-            All Kids
-          </button>
-          {familyProfile.children.map((child, index) => (
-            <button
-              key={index}
-              onClick={() => setChildFilter(child.name.toLowerCase())}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                childFilter === child.name.toLowerCase() 
-                  ? 'bg-tertiary-pink text-neutral-0 shadow-md' 
-                  : 'bg-neutral-10 text-neutral-70 hover:bg-neutral-20'
-              }`}
-            >
-              {child.name}
-            </button>
-          ))}
-        </div>
-        {childFilter !== 'all' && (
-          <div className="mt-2 text-xs text-neutral-60">
-            {childFilter === 'family' && 'Showing activities suitable for the whole family'}
-            {childFilter === 'all_kids' && 'Showing activities suitable for all children'}
-            {!['all', 'family', 'all_kids'].includes(childFilter) && 
-              `Showing activities recommended for ${familyProfile.children.find(c => c.name.toLowerCase() === childFilter)?.name || childFilter}`
-            }
-          </div>
-        )}
-      </div>
 
-      {/* Filters and Sort */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-neutral-0 rounded-xl p-4 border border-neutral-20">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-neutral-70">Filter:</label>
-            <select 
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as typeof filter)}
-              className="text-sm border border-neutral-30 rounded px-2 py-1 bg-neutral-0 text-neutral-100"
-            >
-              <option value="all">All Matches ({enhancedRecommendations.length})</option>
-              <option value="perfect_match">Perfect Matches ({enhancedRecommendations.filter(r => r.recommendationType === 'perfect_match').length})</option>
-              <option value="good_fit">Good Fits ({enhancedRecommendations.filter(r => r.recommendationType === 'good_fit').length})</option>
-            </select>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-neutral-70">Sort:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="text-sm border border-neutral-30 rounded px-2 py-1 bg-neutral-0 text-neutral-100"
-            >
-              <option value="match_score">Best Match</option>
-              <option value="price">Price (Low to High)</option>
-              <option value="distance">Distance</option>
-            </select>
-          </div>
+      {/* View Tabs */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center bg-neutral-10 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+              viewMode === 'grid'
+                ? 'bg-neutral-0 text-neutral-100 shadow-sm'
+                : 'text-neutral-60 hover:text-neutral-80'
+            }`}
+          >
+            <Squares2X2Icon className="w-4 h-4" />
+            <span>Grid View</span>
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+              viewMode === 'map'
+                ? 'bg-neutral-0 text-neutral-100 shadow-sm'
+                : 'text-neutral-60 hover:text-neutral-80'
+            }`}
+          >
+            <MapPinIcon className="w-4 h-4" />
+            <span>Map View</span>
+          </button>
         </div>
 
         <div className="text-sm text-neutral-60">
@@ -476,9 +495,48 @@ export default function Recommendations({
         </div>
       </div>
 
-      {/* Recommendations Grid */}
-      <div className="grid gap-4">
-        {filteredRecommendations.map((recommendation, index) => {
+      {/* Filters and Sort - Only show in grid view */}
+      {viewMode === 'grid' && (
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-neutral-0 rounded-xl p-4 border border-neutral-20">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-neutral-70">Filter:</label>
+              <select 
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as typeof filter)}
+                className="text-sm border border-neutral-30 rounded px-2 py-1 bg-neutral-0 text-neutral-100"
+              >
+                <option value="all">All Matches ({enhancedRecommendations.length})</option>
+                <option value="perfect_match">Perfect Matches ({enhancedRecommendations.filter(r => r.recommendationType === 'perfect_match').length})</option>
+                <option value="good_fit">Good Fits ({enhancedRecommendations.filter(r => r.recommendationType === 'good_fit').length})</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-neutral-70">Sort:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="text-sm border border-neutral-30 rounded px-2 py-1 bg-neutral-0 text-neutral-100"
+              >
+                <option value="match_score">Best Match</option>
+                <option value="price">Price (Low to High)</option>
+                <option value="distance">Distance</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="text-sm text-neutral-60">
+            Showing {filteredRecommendations.length} results
+          </div>
+        </div>
+      )}
+
+      {/* Content Area */}
+      {viewMode === 'grid' ? (
+        /* Recommendations Grid */
+        <div className="grid gap-4">
+          {filteredRecommendations.map((recommendation, index) => {
           const isSelected = selectedIds.has(recommendation.providerId);
           
           return (
@@ -504,9 +562,13 @@ export default function Recommendations({
                       </div>
                     </div>
                     
-                    <h4 className="text-md font-medium text-neutral-80 mb-2">
+                    <h4 className="text-md font-medium text-neutral-80 mb-1">
                       {recommendation.programName}
                     </h4>
+                    
+                    <p className="text-xs text-neutral-50 mb-2">
+                      {recommendation.category}
+                    </p>
                     
                     <p className="text-sm text-neutral-60 mb-3 line-clamp-2">
                       {recommendation.description}
@@ -564,25 +626,21 @@ export default function Recommendations({
                       <div className="flex items-center space-x-2">
                         <CurrencyDollarIcon className="w-4 h-4 text-neutral-50" />
                         <span className="text-neutral-60">
-                          ${recommendation.priceRange?.min}-${recommendation.priceRange?.max}/month
+                          {recommendation.price}
                         </span>
                       </div>
                       
                       <div className="flex items-center space-x-2">
                         <ClockIcon className="w-4 h-4 text-neutral-50" />
                         <span className="text-neutral-60">
-                          {recommendation.schedule?.[0] || 'Flexible schedule'}
+                          {recommendation.schedule}
                         </span>
                       </div>
 
                       <div className="flex items-center space-x-2">
                         <UsersIcon className="w-4 h-4 text-neutral-50" />
                         <span className="text-neutral-60">
-                          {(() => {
-                            const minAge = Math.min(...familyProfile.children.map(c => c.age));
-                            const maxAge = Math.max(...familyProfile.children.map(c => c.age));
-                            return minAge === maxAge ? `Age ${minAge}` : `Ages ${minAge}-${maxAge}`;
-                          })()}
+                          {recommendation.ageRange}
                         </span>
                       </div>
                     </div>
@@ -641,7 +699,17 @@ export default function Recommendations({
             </div>
           );
         })}
-      </div>
+        </div>
+      ) : (
+        /* Map View */
+        <RecommendationsMap
+          familyProfile={displayProfile}
+          recommendations={filteredRecommendations}
+          selectedIds={selectedIds}
+          onSelectionChange={handleSelection}
+          className="w-full"
+        />
+      )}
 
       {/* Selection Summary and Continue */}
       {selectedIds.size > 0 && (

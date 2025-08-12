@@ -30,7 +30,7 @@ import {
 
 // Import components
 import FamilyInput from './components/FamilyInput';
-import ProfileReview from './components/ProfileReview';
+import ProfileReview, { type RecommendationType } from './components/ProfileReview';
 import Recommendations from './components/Recommendations';
 import EmailSimulation from './components/EmailSimulation';
 import CostTracker from './components/CostTracker';
@@ -47,8 +47,8 @@ function createMockRecommendations(familyProfile: FamilyProfile): Recommendation
   
   return [
     {
-      providerId: 1473,
-      programId: 2001,
+      providerId: "1473",
+      programId: "2001",
       matchScore: 0.92,
       matchReasons: ['Perfect age match for your child', 'Matches interest in ' + interests[0], 'Great location in ' + location],
       recommendationType: 'perfect_match',
@@ -64,8 +64,8 @@ function createMockRecommendations(familyProfile: FamilyProfile): Recommendation
       }
     },
     {
-      providerId: 1288,
-      programId: 2002,
+      providerId: "1288",
+      programId: "2002",
       matchScore: 0.87,
       matchReasons: ['Excellent for developing team skills', 'Age-appropriate instruction', 'Convenient schedule'],
       recommendationType: 'good_fit',
@@ -81,8 +81,8 @@ function createMockRecommendations(familyProfile: FamilyProfile): Recommendation
       }
     },
     {
-      providerId: 1645,
-      programId: 2003,
+      providerId: "1645",
+      programId: "2003",
       matchScore: 0.82,
       matchReasons: ['STEM learning matches educational goals', 'Interactive hands-on approach', 'Great reviews from families'],
       recommendationType: 'good_fit',
@@ -98,8 +98,8 @@ function createMockRecommendations(familyProfile: FamilyProfile): Recommendation
       }
     },
     {
-      providerId: 1922,
-      programId: 2004,
+      providerId: "1922",
+      programId: "2004",
       matchScore: 0.78,
       matchReasons: ['Water safety and fitness', 'Professional instruction', 'Flexible scheduling options'],
       recommendationType: 'worth_exploring',
@@ -115,8 +115,8 @@ function createMockRecommendations(familyProfile: FamilyProfile): Recommendation
       }
     },
     {
-      providerId: 1355,
-      programId: 2005,
+      providerId: "1355",
+      programId: "2005",
       matchScore: 0.75,
       matchReasons: ['Creative expression opportunity', 'Builds confidence', 'Age-appropriate content'],
       recommendationType: 'worth_exploring',
@@ -185,6 +185,7 @@ interface DemoState {
   isLoading: boolean;
   error: string | null;
   isScrolling: boolean;
+  recommendationType?: string; // Track the selected recommendation type
 }
 
 export default function POC1DemoPage() {
@@ -199,7 +200,8 @@ export default function POC1DemoPage() {
     totalCost: 0,
     isLoading: false,
     error: null,
-    isScrolling: false
+    isScrolling: false,
+    recommendationType: undefined
   });
 
   // Update phase status helper
@@ -280,7 +282,7 @@ export default function POC1DemoPage() {
   }, [updatePhaseStatus, scrollToTop]);
 
   // Phase 2: Handle profile review completion
-  const handleProfileReview = useCallback(async (updatedProfile: FamilyProfile) => {
+  const handleProfileReview = useCallback(async (updatedProfile: FamilyProfile, recommendationType: RecommendationType, requestData?: any) => {
     setState(prev => ({ 
       ...prev, 
       familyProfile: updatedProfile,
@@ -293,17 +295,28 @@ export default function POC1DemoPage() {
     updatePhaseStatus('recommendations', 'active');
 
     try {
+      // Use new format if provided, otherwise fall back to legacy format
+      const requestBody = requestData ? {
+        ...requestData,
+        options: { 
+          limit: 15,
+          includeExplanations: true,
+          includeMetrics: true
+        }
+      } : {
+        familyProfile: updatedProfile,
+        recommendationType,
+        options: { 
+          limit: 15,
+          includeExplanations: true,
+          includeMetrics: true
+        }
+      };
+
       const response = await fetch('/api/v1/ai/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          familyProfile: updatedProfile,
-          options: { 
-            limit: 15,
-            includeExplanations: true,
-            includeMetrics: true
-          }
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -318,9 +331,10 @@ export default function POC1DemoPage() {
 
       setState(prev => ({
         ...prev,
-        recommendations: data.recommendations || [],
+        recommendations: data.activities || data.recommendations || [],
         totalCost: prev.totalCost + (data.usage?.estimatedCost || 0),
-        isLoading: false
+        isLoading: false,
+        recommendationType: recommendationType
       }));
 
       // Scroll to top after successful recommendations load
@@ -336,7 +350,8 @@ export default function POC1DemoPage() {
         ...prev,
         recommendations: mockRecommendations,
         isLoading: false,
-        error: null // Clear error since we have fallback data
+        error: null, // Clear error since we have fallback data
+        recommendationType: recommendationType
       }));
 
       // Scroll to top after mock recommendations are loaded
@@ -387,7 +402,8 @@ export default function POC1DemoPage() {
       totalCost: 0,
       isLoading: false,
       error: null,
-      isScrolling: false
+      isScrolling: false,
+      recommendationType: undefined
     });
   }, []);
 
@@ -421,6 +437,7 @@ export default function POC1DemoPage() {
             recommendations={recommendations}
             onSelectionComplete={handleRecommendationSelection}
             loading={isLoading}
+            recommendationType={state.recommendationType}
           />
         ) : null;
         

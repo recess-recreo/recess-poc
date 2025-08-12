@@ -153,8 +153,8 @@ export const ActivityMetadataSchema = z.object({
 });
 
 export const RecommendationSchema = z.object({
-  providerId: z.number().int().positive(),
-  programId: z.number().int().positive().optional(),
+  providerId: z.string(),
+  programId: z.string().optional(),
   matchScore: z.number().min(0).max(1),
   matchReasons: z.array(z.string()),
   recommendationType: z.enum(['perfect_match', 'good_fit', 'worth_exploring', 'backup_option']),
@@ -193,6 +193,60 @@ export const RecommendationFiltersSchema = z.object({
 export type ActivityMetadata = z.infer<typeof ActivityMetadataSchema>;
 export type Recommendation = z.infer<typeof RecommendationSchema>;
 export type RecommendationFilters = z.infer<typeof RecommendationFiltersSchema>;
+
+// ============================================================================
+// LIGHTWEIGHT RECOMMENDATION TYPES (FOR ENGINE OUTPUT)
+// ============================================================================
+
+/**
+ * Lightweight recommendation result that contains only IDs and scores.
+ * Used by the recommendation engine to avoid duplication issues.
+ * The API route will deduplicate these IDs and fetch full data separately.
+ */
+export const LightweightRecommendationSchema = z.object({
+  providerId: z.string(),
+  programId: z.string().optional(),
+  eventId: z.string().optional(),
+  vectorSimilarity: z.number().min(0).max(1),
+  practicalScore: z.number().min(0).max(1),
+  matchScore: z.number().min(0).max(1),
+  matchReasons: z.array(z.string()),
+  concerns: z.array(z.string()),
+  ranking: z.object({
+    overall: z.number().min(0).max(1),
+    age: z.number().min(0).max(1),
+    interests: z.number().min(0).max(1),
+    location: z.number().min(0).max(1),
+    schedule: z.number().min(0).max(1),
+    budget: z.number().min(0).max(1),
+    quality: z.number().min(0).max(1),
+  }),
+});
+
+/**
+ * Lightweight recommendation engine result that contains arrays of IDs with scores.
+ * This prevents duplication by allowing the API route to deduplicate IDs before
+ * fetching full data from the database.
+ */
+export const LightweightRecommendationResultSchema = z.object({
+  recommendations: z.array(LightweightRecommendationSchema),
+  searchMetadata: z.object({
+    totalMatches: z.number().int().min(0),
+    vectorSearchResults: z.number().int().min(0),
+    filtersApplied: z.array(z.string()),
+    searchQuery: z.string(),
+    embedding: z.array(z.number()).optional(),
+  }),
+  performance: z.object({
+    vectorSearchMs: z.number().int().min(0),
+    scoringMs: z.number().int().min(0),
+    totalMs: z.number().int().min(0),
+    cacheHit: z.boolean(),
+  }),
+});
+
+export type LightweightRecommendation = z.infer<typeof LightweightRecommendationSchema>;
+export type LightweightRecommendationResult = z.infer<typeof LightweightRecommendationResultSchema>;
 
 // ============================================================================
 // EMAIL PROCESSING TYPES

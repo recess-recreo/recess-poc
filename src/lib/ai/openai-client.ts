@@ -149,7 +149,7 @@ export class AIClient {
       timeout: 30000, // 30 second timeout
       defaultHeaders: {
         'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3000',
-        'X-Title': 'Recess AI POC',
+        'X-Title': 'Recess POC',
       },
     });
 
@@ -213,7 +213,7 @@ export class AIClient {
         const startTime = Date.now();
 
         const completion = await this.openai.chat.completions.create({
-          model,
+          model: modelConfig.name, // Use the proper OpenRouter model name
           messages: validatedRequest.messages,
           temperature: validatedRequest.temperature ?? modelConfig.temperature,
           max_tokens: validatedRequest.max_tokens,
@@ -359,7 +359,7 @@ export class AIClient {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const embedding = await this.openai.embeddings.create({
-          model,
+          model: modelConfig.name, // Use the proper OpenRouter model name
           input: validatedRequest.input,
         });
 

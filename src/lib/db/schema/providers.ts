@@ -27,166 +27,79 @@ import { relations } from 'drizzle-orm';
  * - Not-a-fit tracking: Helps filter out inappropriate providers
  */
 export const providerTable = pgTable('provider', {
-  id: serial('id').primaryKey(),
-  marketId: integer('market_id').notNull(),
-  neighborhoodId: integer('neighborhood_id'),
-  active: boolean('active').notNull(),
-  companyName: varchar('company_name').notNull(),
-  streetLine1: varchar('street_line_1'),
-  streetLine2: varchar('street_line_2'),
-  municipality: varchar('municipality'),
-  administrativeArea: varchar('administrative_area', { length: 2 }),
-  subAdministrativeArea: varchar('sub_administrative_area'),
-  postalCode: varchar('postal_code'),
-  country: varchar('country').notNull(),
-  latitude: numeric('latitude', { precision: 8, scale: 6 }),
-  longitude: numeric('longitude', { precision: 9, scale: 6 }),
-  placeId: varchar('place_id'),
-  website: varchar('website'),
-  phone: varchar('phone'),
+  id: varchar('id').primaryKey(),
+  name: varchar('name').notNull(),
+  description: text('description'),
   email: varchar('email'),
-  description: varchar('description'),
-  blurb: varchar('blurb'),
-  price: varchar('price'),
-  primaryNaics: varchar('primary_naics'),
-  notAFit: boolean('not_a_fit'),
-  notAFitReason: varchar('not_a_fit_reason'),
+  phone: varchar('phone'),
+  website: varchar('website'),
+  address: text('address'),
+  city: varchar('city'),
+  state: varchar('state'),
+  zipCode: varchar('zip_code'),
+  latitude: numeric('latitude', { precision: 10, scale: 8 }),
+  longitude: numeric('longitude', { precision: 11, scale: 8 }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  summerCampRegistrationDate: date('summer_camp_registration_date'),
-  metadata: text('metadata'),
-  instantBooking: boolean('instant_booking'),
+  logoFileName: varchar('logo_file_name'),
+  coverImageFileName: varchar('cover_image_file_name'),
+  active: boolean('active').default(true),
+  verified: boolean('verified').default(false),
 });
 
 /**
  * Provider relations definition.
  *
  * WHY: Relations enable efficient data loading and type safety:
- * - Market/neighborhood: Geographic categorization
- * - Images: Multiple photos per provider
- * - Tags: Flexible categorization system
- * - Camps: Specific program offerings
+ * - Events: Provider's activity offerings
  */
-export const providerRelations = relations(providerTable, ({ one, many }) => ({
-  market: one(marketTable, {
-    fields: [providerTable.marketId],
-    references: [marketTable.id],
-  }),
-  neighborhood: one(neighborhoodTable, {
-    fields: [providerTable.neighborhoodId],
-    references: [neighborhoodTable.id],
-  }),
-  images: many(providerImageTable),
-  tags: many(providerTagTable),
-  camps: many(providerCampsTable),
-  claims: many(providerClaimTable),
-  ownerAssignments: many(providerOwnerAssignmentsTable),
+/**
+ * Event table for provider activities and programs.
+ *
+ * WHY: Events represent actual activities that families can book:
+ * - Each event has specific dates, age ranges, and capacity
+ * - Supports both one-time and recurring activities
+ * - Includes practical information for matching and booking
+ */
+export const eventTable = pgTable('event', {
+  id: varchar('id').primaryKey(),
+  providerId: varchar('provider_id').notNull(),
+  title: varchar('title').notNull(),
+  description: text('description'),
+  category: varchar('category'),
+  minAge: integer('min_age'),
+  maxAge: integer('max_age'),
+  startDate: timestamp('start_date'),
+  endDate: timestamp('end_date'),
+  recurring: boolean('recurring').default(false),
+  price: numeric('price', { precision: 10, scale: 2 }),
+  capacity: integer('capacity'),
+  enrolled: integer('enrolled').default(0),
+  address: text('address'),
+  city: varchar('city'),
+  state: varchar('state'),
+  zipCode: varchar('zip_code'),
+  latitude: numeric('latitude', { precision: 10, scale: 8 }),
+  longitude: numeric('longitude', { precision: 11, scale: 8 }),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  imageFileName: varchar('image_file_name'),
+  active: boolean('active').default(true),
+});
+
+export const providerRelations = relations(providerTable, ({ many }) => ({
+  events: many(eventTable),
 }));
 
-/**
- * Provider image table for storing multiple images per provider.
- *
- * WHY: Separate image table because:
- * - Providers can have multiple images (gallery)
- * - Order matters for display purposes
- * - Captions provide context for each image
- */
-export const providerImageTable = pgTable('provider_image', {
-  id: serial('id').primaryKey(),
-  providerId: integer('provider_id').notNull(),
-  url: varchar('url').notNull(),
-  description: varchar('description'),
-  alt: varchar('alt'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-
-/**
- * Provider camps table for summer camp offerings.
- *
- * WHY: Separate camps table because:
- * - Camps have specific date ranges and age groups
- * - Each camp session needs individual tracking
- * - Supports filtering by camp availability
- */
-export const providerCampsTable = pgTable('provider_camps', {
-  id: serial('id').primaryKey(),
-  providerId: integer('provider_id'),
-  title: text('title').notNull(),
-  description: text('description'),
-  date: date('date'),
-  dateRange: text('date_range'),
-  time: text('time'),
-  location: text('location'),
-  link: text('link'),
-  price: text('price'),
-  registerUrl: text('register_url'),
-  spotsLeft: text('spots_left'),
-  spotsTotal: text('spots_total'),
-  grades: text('grades'),
-  status: text('status'),
-  image: text('image'),
-  createdAt: timestamp('created_at').defaultNow(),
-  metadata: text('metadata'),
-  scraperName: varchar('scraper_name'),
-});
-
-/**
- * Provider claim table for business ownership verification.
- *
- * WHY: Claims system allows:
- * - Business owners to manage their listings
- * - Verification of legitimate ownership
- * - Direct communication with providers
- */
-export const providerClaimTable = pgTable('provider_claim', {
-  id: serial('id').primaryKey(),
-  providerId: integer('provider_id').notNull(),
-  claimantName: varchar('claimant_name').notNull(),
-  claimantEmail: varchar('claimant_email').notNull(),
-  claimantPhone: varchar('claimant_phone'),
-  relationship: varchar('relationship'),
-  status: varchar('status').default('pending'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-
-/**
- * Provider owners table for managing provider accounts.
- */
-export const providerOwnersTable = pgTable('provider_owners', {
-  id: serial('id').primaryKey(),
-  email: varchar('email').notNull(),
-  firstName: varchar('first_name'),
-  lastName: varchar('last_name'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
-
-/**
- * Provider owner assignments junction table.
- */
-export const providerOwnerAssignmentsTable = pgTable('provider_owner_assignments', {
-  providerId: integer('provider_id').notNull(),
-  ownerId: integer('owner_id').notNull(),
-  role: varchar('role').default('owner'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
-
-/**
- * Provider tag junction table for many-to-many relationship.
- */
-export const providerTagTable = pgTable('provider_tag', {
-  providerId: integer('provider_id').notNull(),
-  tagId: integer('tag_id').notNull(),
-});
-
-// Import these from their respective files to avoid circular dependencies
-import { marketTable } from './markets';
-import { neighborhoodTable } from './markets';
+export const eventRelations = relations(eventTable, ({ one }) => ({
+  provider: one(providerTable, {
+    fields: [eventTable.providerId],
+    references: [providerTable.id],
+  }),
+}));
 
 // Type exports for use throughout the application
 export type Provider = typeof providerTable.$inferSelect;
 export type NewProvider = typeof providerTable.$inferInsert;
-export type ProviderImage = typeof providerImageTable.$inferSelect;
-export type ProviderCamp = typeof providerCampsTable.$inferSelect;
-export type ProviderClaim = typeof providerClaimTable.$inferSelect;
+export type Event = typeof eventTable.$inferSelect;
+export type NewEvent = typeof eventTable.$inferInsert;

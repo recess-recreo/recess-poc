@@ -15,7 +15,7 @@
  */
 
 import { db } from '../db/client';
-import { providerTable, providerCampsTable } from '../db/schema/providers';
+import { providerTable } from '../db/schema/providers';
 import { eq, and, isNull, isNotNull } from 'drizzle-orm';
 import { createHash } from 'crypto';
 import {

@@ -15,7 +15,7 @@
 export * from './users';
 export * from './providers';
 export * from './children';
-export * from './events';
+export { eventsTable } from './events';
 export * from './tags';
 export * from './markets';
 export * from './contact';

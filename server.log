@@ -1,0 +1,744 @@
+
+> recess-poc@0.1.0 dev
+> next dev
+
+ ⚠ Warning: Found multiple lockfiles. Selecting /Users/masa/Clients/Recess/projects/package-lock.json.
+   Consider removing the lockfiles at:
+   * /Users/masa/Clients/Recess/projects/poc/package-lock.json
+
+ ⚠ Port 3000 is in use by process 96386, using available port 3001 instead.
+   ▲ Next.js 15.4.6
+   - Local:        http://localhost:3001
+   - Network:      http://172.19.0.172:3001
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3s
+ ○ Compiling /api/v1/ai/parse-family ...
+ ✓ Compiled /api/v1/ai/parse-family in 550ms (959 modules)
+OpenRouter API key configured: sk-or-v1...94bf
+OpenRouter chat completion: 2708 tokens, $0.0005 cost
+Family parsing successful: 2708 tokens, $0.0005 cost, 1.00 confidence
+ POST /api/v1/ai/parse-family 200 in 6233ms
+ ✓ Compiled /middleware in 117ms (108 modules)
+ ○ Compiling /demo/poc1 ...
+ ✓ Compiled /demo/poc1 in 787ms (1363 modules)
+ GET /demo/poc1 200 in 946ms
+ ✓ Compiled in 104ms (294 modules)
+ ✓ Compiled / in 245ms (1356 modules)
+ GET / 200 in 290ms
+ GET /demo/poc1 200 in 35ms
+OpenRouter API key configured: sk-or-v1...94bf
+OpenRouter chat completion: 2828 tokens, $0.0005 cost
+Family parsing successful: 2828 tokens, $0.0005 cost, 1.00 confidence
+ POST /api/v1/ai/parse-family 200 in 9178ms
+OpenRouter chat completion: 2744 tokens, $0.0005 cost
+Family parsing successful: 2744 tokens, $0.0005 cost, 1.00 confidence
+ POST /api/v1/ai/parse-family 200 in 4593ms
+ ✓ Compiled /api/v1/ai/recommendations in 342ms (1364 modules)
+OpenRouter API key configured: sk-or-v1...94bf
+Initializing local embeddings client...
+Local embeddings client initialized
+Local embeddings client is available
+OpenRouter embedding failed (attempt 1/4), retrying in 1000ms: No usage information returned from OpenRouter embeddings
+OpenRouter embedding failed (attempt 2/4), retrying in 2000ms: No usage information returned from OpenRouter embeddings
+OpenRouter embedding failed (attempt 3/4), retrying in 4000ms: No usage information returned from OpenRouter embeddings
+OpenAI client health check failed: Error: OpenRouter embedding failed after 4 attempts: No usage information returned from OpenRouter embeddings
+    at AIClient.createEmbedding (src/lib/ai/openai-client.ts:444:10)
+    at async RecommendationEngine.healthCheck (src/lib/ai/recommendation-engine.ts:1862:8)
+    at async POST (src/app/api/v1/ai/recommendations/route.ts:187:24)
+  442 |     }
+  443 |
+> 444 |     throw new Error(`OpenRouter embedding failed after ${maxRetries + 1} attempts: ${lastError?.message}`);
+      |          ^
+  445 |   }
+  446 |
+  447 |   /**
+Starting parallel vector search...
+Attempting to generate embedding using local model...
+Attempting Redis connection (attempt 1/5)...
+Using Redis URL: redis:***@localhost:6380
+Redis client connected successfully
+Redis client ready for commands
+Redis connection successful
+Loading local embedding model: Xenova/all-MiniLM-L6-v2...
+Model loading progress: 100%
+Model loading progress: 100%
+Model loading progress: 100%
+Model loading progress: 100%
+Model all-MiniLM-L6-v2 loaded successfully
+Generating local embeddings for 1 text(s) using all-MiniLM-L6-v2...
+Local embeddings generated: 88 tokens, 146ms, $0 cost
+Cached local embedding: local_embed:1d68921cb989be2b632ff2efb20d76bf (TTL: 86400s)
+Generated local search embedding: 1536 dimensions, query: "Family with children: 6-year-old Maya interested in dance, gymnastics. Located in Hyde Park, Austin,..." (146ms)
+Embedding validation passed: 1536 dimensions, sample values: [0.0420, -0.0622, 0.0915, ..., 0.0000, 0.0000, 0.0000]
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Sample age range extraction: {
+  camp_id: undefined,
+  type: 'session',
+  grades: null,
+  ages: undefined,
+  min_age: undefined,
+  max_age: undefined
+}
+Sample age range extraction: {
+  camp_id: undefined,
+  type: 'provider',
+  grades: undefined,
+  ages: undefined,
+  min_age: undefined,
+  max_age: undefined
+}
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Sample age range extraction: {
+  camp_id: undefined,
+  type: 'session',
+  grades: null,
+  ages: undefined,
+  min_age: undefined,
+  max_age: undefined
+}
+Age range missing in some provider/camp metadata - this is normal for some activities
+Caching recommendations with key: recommendations:eyJmYW1pbHlQcm9maWxlIjp7ImFkdWx0
+Vector search completed in 170ms with 30 results
+Starting AI enhancement...
+AI enhancement failed or timed out, using vector-only results: Error: AI processing timeout
+    at Timeout.eval [as _onTimeout] (src/app/api/v1/ai/recommendations/route.ts:400:34)
+  398 |         
+  399 |         const aiTimeout = new Promise<never>((_, reject) => 
+> 400 |           setTimeout(() => reject(new Error('AI processing timeout')), 8000)
+      |                                  ^
+  401 |         );
+  402 |
+  403 |         const aiPromise = aiClient.createChatCompletion({
+Recommendations generated: 15 results, 0 tokens, $0.0000 cost, 20621ms total (vector: 170ms, AI: 8009ms)
+Slow recommendation generation: 20621ms - consider optimization
+ POST /api/v1/ai/recommendations 200 in 21171ms
+OpenRouter chat completion: 3704 tokens, $0.0009 cost
+Cached chat completion: rec-ai-{"workingFamilyProfile":{"adults":[{"name":"David","role":"parent"}],"children":[{"name":"Maya","age (TTL: 1800s)
+ ✓ Compiled in 177ms (381 modules)
+ ✓ Compiled in 201ms (296 modules)
+ GET /demo/poc1 200 in 101ms
+ GET /demo/poc1 200 in 99ms
+ ✓ Compiled /api/v1/ai/parse-family in 204ms (1074 modules)
+OpenRouter API key configured: sk-or-v1...94bf
+OpenRouter chat completion: 2784 tokens, $0.0005 cost
+Family parsing successful: 2784 tokens, $0.0005 cost, 1.00 confidence
+ POST /api/v1/ai/parse-family 200 in 12235ms
+OpenRouter chat completion: 2779 tokens, $0.0005 cost
+Family parsing successful: 2779 tokens, $0.0005 cost, 1.00 confidence
+ POST /api/v1/ai/parse-family 200 in 5344ms
+ ✓ Compiled /api/v1/ai/recommendations in 159ms (1082 modules)
+OpenRouter API key configured: sk-or-v1...94bf
+Initializing local embeddings client...
+Local embeddings client initialized
+Local embeddings client is available
+ GET /demo/poc1 200 in 61ms
+ GET /demo/poc1 200 in 61ms
+OpenRouter embedding failed (attempt 1/4), retrying in 1000ms: No usage information returned from OpenRouter embeddings
+OpenRouter embedding failed (attempt 2/4), retrying in 2000ms: No usage information returned from OpenRouter embeddings
+OpenRouter embedding failed (attempt 3/4), retrying in 4000ms: No usage information returned from OpenRouter embeddings
+OpenAI client health check failed: Error: OpenRouter embedding failed after 4 attempts: No usage information returned from OpenRouter embeddings
+    at AIClient.createEmbedding (src/lib/ai/openai-client.ts:444:10)
+    at async RecommendationEngine.healthCheck (src/lib/ai/recommendation-engine.ts:1901:8)
+    at async POST (src/app/api/v1/ai/recommendations/route.ts:187:24)
+  442 |     }
+  443 |
+> 444 |     throw new Error(`OpenRouter embedding failed after ${maxRetries + 1} attempts: ${lastError?.message}`);
+      |          ^
+  445 |   }
+  446 |
+  447 |   /**
+Starting parallel vector search...
+Attempting to generate embedding using local model...
+Attempting Redis connection (attempt 1/5)...
+Using Redis URL: redis:***@localhost:6380
+Redis client connected successfully
+Redis client ready for commands
+Redis connection successful
+Loading local embedding model: Xenova/all-MiniLM-L6-v2...
+Model loading progress: 100%
+Model loading progress: 100%
+Model loading progress: 100%
+Model loading progress: 100%
+Model all-MiniLM-L6-v2 loaded successfully
+Generating local embeddings for 1 text(s) using all-MiniLM-L6-v2...
+Local embeddings generated: 95 tokens, 131ms, $0 cost
+Cached local embedding: local_embed:733a85a502bf63f484071df502fca313 (TTL: 86400s)
+Generated local search embedding: 1536 dimensions, query: "Family with children: 7-year-old Emma interested in arts, drawing; 10-year-old Jake interested in sp..." (131ms)
+Embedding validation passed: 1536 dimensions, sample values: [-0.0036, -0.0490, 0.1173, ..., 0.0000, 0.0000, 0.0000]
+Age range missing in some provider/camp metadata - this is normal for some activities
+Sample age range extraction: {
+  camp_id: undefined,
+  type: 'session',
+  grades: null,
+  ages: undefined,
+  min_age: undefined,
+  max_age: undefined
+}
+Skipping duplicate provider-program: Austin Karate Academy (646-default)
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Sample age range extraction: {
+  camp_id: undefined,
+  type: 'provider',
+  grades: undefined,
+  ages: undefined,
+  min_age: undefined,
+  max_age: undefined
+}
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Sample age range extraction: {
+  camp_id: undefined,
+  type: 'provider',
+  grades: undefined,
+  ages: undefined,
+  min_age: undefined,
+  max_age: undefined
+}
+Deduplication: 90 vector results → 70 unique recommendations (removed 20 duplicates)
+Caching recommendations with key: recommendations:eyJmYW1pbHlQcm9maWxlIjp7ImFkdWx0
+Vector search completed in 156ms with 30 results
+Starting AI enhancement...
+AI enhancement failed or timed out, using vector-only results: Error: AI processing timeout
+    at Timeout.eval [as _onTimeout] (src/app/api/v1/ai/recommendations/route.ts:410:34)
+  408 |         
+  409 |         const aiTimeout = new Promise<never>((_, reject) => 
+> 410 |           setTimeout(() => reject(new Error('AI processing timeout')), 8000)
+      |                                  ^
+  411 |         );
+  412 |
+  413 |         const aiPromise = aiClient.createChatCompletion({
+Recommendations generated: 15 results, 0 tokens, $0.0000 cost, 19944ms total (vector: 156ms, AI: 8008ms)
+Slow recommendation generation: 19944ms - consider optimization
+ POST /api/v1/ai/recommendations 200 in 20186ms
+OpenRouter chat completion: 3305 tokens, $0.0008 cost
+Cached chat completion: rec-ai-{"workingFamilyProfile":{"adults":[{"name":"Sarah","role":"parent"}],"children":[{"name":"Emma","age (TTL: 1800s)
+ ✓ Compiled in 301ms (677 modules)
+ GET /demo/poc1 200 in 109ms
+ GET /demo/poc1 200 in 109ms
+ ✓ Compiled in 144ms (296 modules)
+ GET /demo/poc1 200 in 36ms
+ GET /demo/poc1 200 in 35ms
+ ✓ Compiled in 145ms (296 modules)
+ GET /demo/poc1 200 in 30ms
+ GET /demo/poc1 200 in 29ms
+ ✓ Compiled /api/v1/ai/parse-family in 194ms (1074 modules)
+OpenRouter API key configured: sk-or-v1...94bf
+OpenRouter chat completion: 2779 tokens, $0.0005 cost
+Family parsing successful: 2779 tokens, $0.0005 cost, 1.00 confidence
+ POST /api/v1/ai/parse-family 200 in 6542ms
+ ✓ Compiled /api/v1/ai/recommendations in 175ms (1082 modules)
+OpenRouter API key configured: sk-or-v1...94bf
+Initializing local embeddings client...
+Local embeddings client initialized
+Local embeddings client is available
+ GET /demo/poc1 200 in 45ms
+ GET /demo/poc1 200 in 44ms
+OpenRouter embedding failed (attempt 1/4), retrying in 1000ms: No usage information returned from OpenRouter embeddings
+OpenRouter embedding failed (attempt 2/4), retrying in 2000ms: No usage information returned from OpenRouter embeddings
+OpenRouter embedding failed (attempt 3/4), retrying in 4000ms: No usage information returned from OpenRouter embeddings
+OpenAI client health check failed: Error: OpenRouter embedding failed after 4 attempts: No usage information returned from OpenRouter embeddings
+    at AIClient.createEmbedding (src/lib/ai/openai-client.ts:444:10)
+    at async RecommendationEngine.healthCheck (src/lib/ai/recommendation-engine.ts:1942:8)
+    at async POST (src/app/api/v1/ai/recommendations/route.ts:187:24)
+  442 |     }
+  443 |
+> 444 |     throw new Error(`OpenRouter embedding failed after ${maxRetries + 1} attempts: ${lastError?.message}`);
+      |          ^
+  445 |   }
+  446 |
+  447 |   /**
+Starting parallel vector search...
+Attempting to generate embedding using local model...
+Attempting Redis connection (attempt 1/5)...
+Using Redis URL: redis:***@localhost:6380
+Redis client connected successfully
+Redis client ready for commands
+Redis connection successful
+Cache hit for local embedding: local_embed:733a85a502bf63f484071df502fca313
+Generated local search embedding: 1536 dimensions, query: "Family with children: 7-year-old Emma interested in arts, drawing; 10-year-old Jake interested in sp..." (131ms)
+Embedding validation passed: 1536 dimensions, sample values: [-0.0036, -0.0490, 0.1173, ..., 0.0000, 0.0000, 0.0000]
+Sample age range extraction: {
+  camp_id: undefined,
+  type: 'session',
+  grades: null,
+  ages: undefined,
+  min_age: undefined,
+  max_age: undefined
+}
+Skipping duplicate provider-program: Austin Karate Academy (646-default)
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Skipping duplicate provider-program: YMCA (East Communities) (1513-default)
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Sample age range extraction: {
+  camp_id: undefined,
+  type: 'session',
+  grades: null,
+  ages: undefined,
+  min_age: undefined,
+  max_age: undefined
+}
+Age range missing in some provider/camp metadata - this is normal for some activities
+Age range missing in some provider/camp metadata - this is normal for some activities
+Skipping duplicate provider-program: Dance Discovery (613-default)
+Deduplication: 90 vector results → 70 unique recommendations (removed 20 duplicates)
+Caching recommendations with key: recommendations:eyJmYW1pbHlQcm9maWxlIjp7ImFkdWx0
+Vector search completed in 35ms with 30 results
+Starting AI enhancement...
+Cache hit for chat completion: rec-ai-{"workingFamilyProfile":{"adults":[{"name":"Sarah","role":"parent"}],"children":[{"name":"Emma","age
+Failed to parse AI recommendations, using fallback: SyntaxError: Unexpected token '`', "```json
+{
+"... is not valid JSON
+    at JSON.parse (<anonymous>)
+    at POST (src/app/api/v1/ai/recommendations/route.ts:436:41)
+  434 |
+  435 |         try {
+> 436 |           const aiRecommendations = JSON.parse(aiResponse.content);
+      |                                         ^
+  437 |           const validatedAIResponse = ActivityRecommendationSchema.parse(aiRecommendations);
+  438 |           
+  439 |           // Apply deduplication to AI-enhanced recommendations as well
+Recommendations generated: 15 results, 3305 tokens, $0.0008 cost, 12053ms total (vector: 35ms, AI: 29ms)
+Slow recommendation generation: 12053ms - consider optimization
+ POST /api/v1/ai/recommendations 200 in 12308ms
+ ✓ Compiled in 132ms (381 modules)
+ ✓ Compiled in 186ms (296 modules)
+ ⨯ Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+    at async J (.next/server/app/demo/poc1/page.js:1:5405) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json',
+  page: '/demo/poc1'
+}
+ ⨯ Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+    at async J (.next/server/app/demo/poc1/page.js:1:5405) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json',
+  page: '/demo/poc1'
+}
+ ✓ Compiled /_error in 441ms (991 modules)
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /demo/poc1 500 in 2667ms
+ GET /demo/poc1 500 in 2667ms
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/pages/_document.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/pages/_document.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /demo/poc1 500 in 303ms
+ GET /demo/poc1 500 in 304ms
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/pages/_document.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/pages/_document.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /demo/poc1 500 in 291ms
+ GET /demo/poc1 500 in 291ms
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/pages/_document.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /demo/poc1 500 in 276ms
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/pages/_document.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /demo/poc1 500 in 412ms
+ ✓ Compiled /_not-found in 332ms (992 modules)
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /_next/static/webpack/47a8b6b444a028a2.webpack.hot-update.json 500 in 572ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /_next/static/webpack/47a8b6b444a028a2.webpack.hot-update.json 500 in 111ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/app/_not-found/page.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/masa/Clients/Recess/projects/poc/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/Users/masa/Clients/Recess/projects/poc/.next/cache/webpack/client-development-fallback/0.pack.gz'
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /demo/poc1 500 in 408ms
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/app/_not-found/page.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /demo/poc1 500 in 263ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /_next/static/webpack/47a8b6b444a028a2.webpack.hot-update.json 500 in 139ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json',
+  page: '/demo/poc1'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/server/pages-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/server/pages-manifest.json'
+}
+ GET /demo/poc1 500 in 32ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/server/app-paths-manifest.json'
+}
+ GET /_next/static/chunks/fallback/webpack.js 500 in 91ms
+ GET /_next/static/chunks/fallback/main.js 500 in 91ms
+ GET /_next/static/chunks/fallback/react-refresh.js 500 in 92ms
+ GET /_next/static/chunks/fallback/pages/_app.js 500 in 91ms
+ GET /_next/static/chunks/fallback/pages/_error.js 500 in 91ms
+ ✓ Compiled in 156ms (444 modules)
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /_next/static/webpack/47a8b6b444a028a2.webpack.hot-update.json 500 in 118ms
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/app/_not-found/page.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /demo/poc1 500 in 134ms
+ ⨯ Error: Cannot find module './985.js'
+Require stack:
+- /Users/masa/Clients/Recess/projects/poc/.next/server/webpack-runtime.js
+- /Users/masa/Clients/Recess/projects/poc/.next/server/app/_not-found/page.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/require.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/load-components.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/utils.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/options.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/swc/index.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/config.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/next.js
+- /Users/masa/Clients/Recess/projects/poc/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/demo/poc1/page.js:2:113741)
+    at Object.<anonymous> (.next/server/app/demo/poc1/page.js:2:113791) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/demo/poc1'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /demo/poc1 500 in 254ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /_next/static/chunks/fallback/webpack.js 500 in 281ms
+ GET /_next/static/chunks/fallback/react-refresh.js 500 in 280ms
+ GET /_next/static/chunks/fallback/main.js 500 in 280ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/masa/Clients/Recess/projects/poc/.next/routes-manifest.json'
+}
+ GET /_next/static/chunks/fallback/pages/_app.js 500 in 177ms
+ GET /_next/static/chunks/fallback/pages/_error.js 500 in 176ms
+ ✓ Compiled in 141ms (444 modules)
+ ✓ Compiled in 129ms (444 modules)
+[?25h
