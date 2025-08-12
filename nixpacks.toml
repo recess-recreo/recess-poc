@@ -2,9 +2,13 @@ providers = ["node"]
 
 [phases.setup]
 nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
+# Clear any existing caches to avoid conflicts with Railway cache mounting
+cmds = ["rm -rf node_modules/.cache || true"]
 
 [phases.install]
-cmds = ["npm ci --production=false"]
+# Use npm install instead of npm ci to handle cache conflicts better
+# npm ci is more strict about lockfile but can conflict with mounted caches
+cmds = ["npm install --production=false"]
 
 [phases.build]
 cmds = ["NODE_OPTIONS='--max-old-space-size=4096' npm run build"]
@@ -17,3 +21,7 @@ cmd = "npm start"
 NIXPACKS_NO_CACHE = "false"
 # Prevent transformers.js from downloading models during build
 TRANSFORMERS_CACHE = "/tmp/transformers-cache"
+
+[caches]
+# Only cache Next.js build cache, avoid node_modules cache conflicts
+paths = [".next/cache"]
