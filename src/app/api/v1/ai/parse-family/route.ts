@@ -104,6 +104,15 @@ interface ParseFamilyResponse {
 export async function POST(request: NextRequest) {
   let aiClient;
   
+  // Log environment status for debugging
+  console.log('Parse-family API called');
+  console.log('Environment:', {
+    NODE_ENV: process.env.NODE_ENV,
+    HAS_OPENROUTER_KEY: !!process.env.OPENROUTER_API_KEY,
+    KEY_LENGTH: process.env.OPENROUTER_API_KEY?.length || 0,
+    SITE_URL: process.env.SITE_URL || 'not set',
+  });
+  
   try {
     // Parse and validate request body
     const body = await request.json();

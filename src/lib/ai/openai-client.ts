@@ -575,6 +575,12 @@ let globalAIClient: AIClient | null = null;
  * Get or create the global AI client instance.
  */
 export function getAIClient(): AIClient {
+  // Always create a new client if no API key is set (for better error handling)
+  if (!process.env.OPENROUTER_API_KEY) {
+    console.error('OPENROUTER_API_KEY not found in environment variables');
+    throw new Error('OPENROUTER_API_KEY environment variable is required');
+  }
+  
   // In development, always create a new client to pick up env changes
   if (process.env.NODE_ENV === 'development') {
     return new AIClient();
