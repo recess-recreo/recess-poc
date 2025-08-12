@@ -16,8 +16,10 @@ echo
 echo "Deploying with environment variables..."
 export NODE_ENV=production
 export SESSION_SECRET="poc-demo-secret-2024"
-export OPENROUTER_API_KEY="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"
+export OPENROUTER_API_KEY="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"
 export DEMO_PASSWORD="recess2024"
+export SITE_URL="https://recess-webapp-poc-production.up.railway.app"
+export DEMO_MODE="false"
 
 echo "Starting deployment..."
 railway up --detach

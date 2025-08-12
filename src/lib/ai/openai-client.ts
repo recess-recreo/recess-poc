@@ -141,14 +141,17 @@ export class AIClient {
 
     // Log API key validation (first 8 and last 4 characters for debugging)
     const maskedKey = `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`;
+    const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
     console.log(`OpenRouter API key configured: ${maskedKey}`);
+    console.log(`OpenRouter HTTP-Referer header: ${siteUrl}`);
+    console.log(`OpenRouter X-Title header: Recess POC`);
 
     this.openai = new OpenAI({
       apiKey,
       baseURL: 'https://openrouter.ai/api/v1',
       timeout: 30000, // 30 second timeout
       defaultHeaders: {
-        'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3000',
+        'HTTP-Referer': siteUrl,
         'X-Title': 'Recess POC',
       },
     });
