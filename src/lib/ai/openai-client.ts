@@ -139,6 +139,10 @@ export class AIClient {
       throw new Error('OPENROUTER_API_KEY environment variable is required');
     }
 
+    // Log API key validation (first 8 and last 4 characters for debugging)
+    const maskedKey = `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`;
+    console.log(`OpenRouter API key configured: ${maskedKey}`);
+
     this.openai = new OpenAI({
       apiKey,
       baseURL: 'https://openrouter.ai/api/v1',
@@ -264,6 +268,14 @@ export class AIClient {
 
       } catch (error) {
         lastError = error as Error;
+        
+        // Enhanced error logging
+        console.error('OpenRouter API error:', {
+          status: (error as any)?.status,
+          code: (error as any)?.code,
+          message: lastError.message,
+          type: (error as any)?.type,
+        });
         
         // Log failed usage
         const failedUsageMetrics: AIUsageMetrics = {

@@ -21,8 +21,13 @@ interface FamilyInputProps {
   className?: string;
 }
 
-// Sample family descriptions for quick testing - Austin focused
+// Sample family descriptions for quick testing - diverse examples
 const SAMPLE_INPUTS = [
+  {
+    title: "Three Kids with Different Interests",
+    description: "We're looking for activities for our three kids: Emma (8) who loves art and reading, Jake (10) who's into soccer and video games, and Lily (6) who enjoys dancing and animals. We'd prefer weekend programs within 15 minutes of downtown, with a budget of $200/month per child. Emma is shy and does better in small groups, while Jake and Lily are very social.",
+    category: "Multiple Children"
+  },
   {
     title: "Westlake Family with Two Kids",
     description: "Hi! I'm Sarah with two kids - Emma (7) loves art and drawing, and Jake (10) plays soccer and is really into robotics. We live in Westlake Hills and I'm looking for after-school activities. Budget is around $200-300/month per kid. We can only do activities on weekday afternoons after 3pm because of school - no mornings or evenings on weekdays due to homework time.",
@@ -37,11 +42,6 @@ const SAMPLE_INPUTS = [
     title: "Summer Camp Planning in Zilker",
     description: "Jennifer here! My twins Alex and Sam (both 9) need summer camp. Alex is into science experiments and building things, Sam loves theater and music. We live in the Zilker neighborhood. Looking for half-day programs in July, budget around $500/week per child. They have different interests but would prefer same location.",
     category: "Summer Camps"
-  },
-  {
-    title: "Weekend Activities in Mueller",
-    description: "We're the Johnson family - mom, dad, and 8-year-old Lily who's obsessed with animals and nature. Looking for weekend family activities in Mueller. Lily wants to learn about wildlife and maybe volunteer with animals. Budget is $100-200 for family activities.",
-    category: "Weekend Programs"
   }
 ];
 
