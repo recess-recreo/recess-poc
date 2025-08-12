@@ -164,9 +164,15 @@ export class AIClient {
   private usageMetrics: AIUsageMetrics[] = [];
 
   constructor() {
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    // Try multiple sources for API key due to Railway env var issues
+    const apiKey = process.env.OPENROUTER_API_KEY || 
+                   process.env.OPENROUTER_API_KEY_NEW ||
+                   process.env.OPENROUTER_KEY;
+    
     if (!apiKey) {
-      throw new Error('OPENROUTER_API_KEY environment variable is required');
+      console.error('No OpenRouter API key found in any environment variable');
+      console.error('Checked: OPENROUTER_API_KEY, OPENROUTER_API_KEY_NEW, OPENROUTER_KEY');
+      throw new Error('OpenRouter API key environment variable is required');
     }
 
     // Log API key validation (first 8 and last 4 characters for debugging)
@@ -575,10 +581,15 @@ let globalAIClient: AIClient | null = null;
  * Get or create the global AI client instance.
  */
 export function getAIClient(): AIClient {
-  // Always create a new client if no API key is set (for better error handling)
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.error('OPENROUTER_API_KEY not found in environment variables');
-    throw new Error('OPENROUTER_API_KEY environment variable is required');
+  // Check multiple sources for API key
+  const hasApiKey = process.env.OPENROUTER_API_KEY || 
+                    process.env.OPENROUTER_API_KEY_NEW ||
+                    process.env.OPENROUTER_KEY;
+  
+  if (!hasApiKey) {
+    console.error('No OpenRouter API key found in environment variables');
+    console.error('Checked: OPENROUTER_API_KEY, OPENROUTER_API_KEY_NEW, OPENROUTER_KEY');
+    throw new Error('OpenRouter API key environment variable is required');
   }
   
   // In development, always create a new client to pick up env changes
