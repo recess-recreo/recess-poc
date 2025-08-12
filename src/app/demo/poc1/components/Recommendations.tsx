@@ -180,6 +180,7 @@ export default function Recommendations({
 }: RecommendationsProps) {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState<'all' | 'perfect_match' | 'good_fit'>('all');
+  const [childFilter, setChildFilter] = useState<'all' | 'family' | 'all_kids' | string>('all');
   const [sortBy, setSortBy] = useState<'match_score' | 'price' | 'distance'>('match_score');
 
   // Enhanced recommendations with real data extracted from AI recommendations
@@ -203,9 +204,61 @@ export default function Recommendations({
   const filteredRecommendations = useMemo(() => {
     let filtered = enhancedRecommendations;
 
-    // Apply filter
+    // Apply match type filter
     if (filter !== 'all') {
       filtered = filtered.filter(rec => rec.recommendationType === filter);
+    }
+
+    // Apply child filter (for demo purposes, we'll filter based on match reasons and interests)
+    if (childFilter !== 'all') {
+      if (childFilter === 'family') {
+        // Show activities suitable for the whole family
+        filtered = filtered.filter(rec => 
+          rec.matchReasons.some(reason => 
+            reason.toLowerCase().includes('family') || 
+            reason.toLowerCase().includes('all ages') ||
+            reason.toLowerCase().includes('parent')
+          ) ||
+          rec.interests.some(interest => 
+            interest.toLowerCase().includes('family') ||
+            interest.toLowerCase().includes('parent')
+          )
+        );
+      } else if (childFilter === 'all_kids') {
+        // Show activities suitable for all children in the family
+        filtered = filtered.filter(rec => 
+          rec.matchReasons.some(reason => 
+            reason.toLowerCase().includes('all children') ||
+            reason.toLowerCase().includes('siblings') ||
+            reason.toLowerCase().includes('group')
+          ) ||
+          rec.interests.some(interest => 
+            interest.toLowerCase().includes('group') ||
+            interest.toLowerCase().includes('team')
+          )
+        );
+      } else {
+        // Filter for specific child (childFilter contains child name)
+        const childName = childFilter.toLowerCase();
+        filtered = filtered.filter(rec => 
+          rec.matchReasons.some(reason => 
+            reason.toLowerCase().includes(childName)
+          ) ||
+          rec.interests.some(interest => 
+            // For demo, we'll show activities that match the child's implied interests
+            childName.includes('emma') ? (
+              interest.toLowerCase().includes('art') ||
+              interest.toLowerCase().includes('music') ||
+              interest.toLowerCase().includes('creative')
+            ) :
+            childName.includes('jake') ? (
+              interest.toLowerCase().includes('sport') ||
+              interest.toLowerCase().includes('active') ||
+              interest.toLowerCase().includes('physical')
+            ) : true
+          )
+        );
+      }
     }
 
     // Apply sorting
@@ -226,7 +279,7 @@ export default function Recommendations({
     });
 
     return filtered;
-  }, [enhancedRecommendations, filter, sortBy]);
+  }, [enhancedRecommendations, filter, childFilter, sortBy]);
 
   const handleSelection = (providerId: number, selected: boolean) => {
     const newSelection = new Set(selectedIds);
@@ -324,6 +377,68 @@ export default function Recommendations({
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Child Filter Buttons */}
+      <div className="bg-neutral-0 rounded-xl border border-neutral-20 p-4">
+        <div className="flex items-center space-x-2 mb-3">
+          <UsersIcon className="w-5 h-5 text-primary" />
+          <h4 className="font-medium text-neutral-100">Filter by family member:</h4>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setChildFilter('all')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+              childFilter === 'all' 
+                ? 'bg-primary text-neutral-0 shadow-md' 
+                : 'bg-neutral-10 text-neutral-70 hover:bg-neutral-20'
+            }`}
+          >
+            All Activities
+          </button>
+          <button
+            onClick={() => setChildFilter('family')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+              childFilter === 'family' 
+                ? 'bg-secondary text-neutral-0 shadow-md' 
+                : 'bg-neutral-10 text-neutral-70 hover:bg-neutral-20'
+            }`}
+          >
+            Family
+          </button>
+          <button
+            onClick={() => setChildFilter('all_kids')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+              childFilter === 'all_kids' 
+                ? 'bg-tertiary-orange text-neutral-0 shadow-md' 
+                : 'bg-neutral-10 text-neutral-70 hover:bg-neutral-20'
+            }`}
+          >
+            All Kids
+          </button>
+          {familyProfile.children.map((child, index) => (
+            <button
+              key={index}
+              onClick={() => setChildFilter(child.name.toLowerCase())}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                childFilter === child.name.toLowerCase() 
+                  ? 'bg-tertiary-pink text-neutral-0 shadow-md' 
+                  : 'bg-neutral-10 text-neutral-70 hover:bg-neutral-20'
+              }`}
+            >
+              {child.name}
+            </button>
+          ))}
+        </div>
+        {childFilter !== 'all' && (
+          <div className="mt-2 text-xs text-neutral-60">
+            {childFilter === 'family' && 'Showing activities suitable for the whole family'}
+            {childFilter === 'all_kids' && 'Showing activities suitable for all children'}
+            {!['all', 'family', 'all_kids'].includes(childFilter) && 
+              `Showing activities recommended for ${familyProfile.children.find(c => c.name.toLowerCase() === childFilter)?.name || childFilter}`
+            }
+          </div>
+        )}
       </div>
 
       {/* Filters and Sort */}
@@ -463,7 +578,11 @@ export default function Recommendations({
                       <div className="flex items-center space-x-2">
                         <UsersIcon className="w-4 h-4 text-neutral-50" />
                         <span className="text-neutral-60">
-                          Ages {Math.min(...familyProfile.children.map(c => c.age))}-{Math.max(...familyProfile.children.map(c => c.age))}
+                          {(() => {
+                            const minAge = Math.min(...familyProfile.children.map(c => c.age));
+                            const maxAge = Math.max(...familyProfile.children.map(c => c.age));
+                            return minAge === maxAge ? `Age ${minAge}` : `Ages ${minAge}-${maxAge}`;
+                          })()}
                         </span>
                       </div>
                     </div>
