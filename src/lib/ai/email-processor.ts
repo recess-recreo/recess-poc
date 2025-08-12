@@ -43,12 +43,18 @@ export const EmailGenerationRequestSchema = z.object({
     tone: z.enum(['professional', 'casual', 'urgent']).optional().default('professional'),
     includeHtml: z.boolean().optional().default(false),
     useCache: z.boolean().optional().default(true),
-    model: z.enum(['gpt-4o-mini', 'gpt-4o']).optional().default('gpt-4o-mini'),
+    model: z.enum([
+      'gpt-4o-mini', 
+      'gpt-4o', 
+      'mistralai/mistral-7b-instruct:free',
+      'google/gemma-2-9b-it:free',
+      'microsoft/phi-3-mini-128k-instruct:free'
+    ]).optional().default('mistralai/mistral-7b-instruct:free'),
   }).optional().default({
     tone: 'professional',
     includeHtml: false,
     useCache: true,
-    model: 'gpt-4o-mini'
+    model: 'mistralai/mistral-7b-instruct:free'
   }),
 });
 
@@ -64,11 +70,17 @@ export const EmailParsingRequestSchema = z.object({
   options: z.object({
     extractMetadata: z.boolean().optional().default(true),
     useCache: z.boolean().optional().default(true),
-    model: z.enum(['gpt-4o-mini', 'gpt-4o']).optional().default('gpt-4o-mini'),
+    model: z.enum([
+      'gpt-4o-mini', 
+      'gpt-4o', 
+      'mistralai/mistral-7b-instruct:free',
+      'google/gemma-2-9b-it:free',
+      'microsoft/phi-3-mini-128k-instruct:free'
+    ]).optional().default('mistralai/mistral-7b-instruct:free'),
   }).optional().default({
     extractMetadata: true,
     useCache: true,
-    model: 'gpt-4o-mini'
+    model: 'mistralai/mistral-7b-instruct:free'
   }),
 });
 

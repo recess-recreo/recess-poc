@@ -66,6 +66,28 @@ export const AI_MODELS: Record<string, AIModelConfig> = {
     maxTokens: 128000,
     temperature: 0.7,
   },
+  // Free OpenRouter models
+  'mistralai/mistral-7b-instruct:free': {
+    name: 'mistralai/mistral-7b-instruct:free',
+    inputCostPer1kTokens: 0, // Free model
+    outputCostPer1kTokens: 0, // Free model
+    maxTokens: 32768,
+    temperature: 0.7,
+  },
+  'google/gemma-2-9b-it:free': {
+    name: 'google/gemma-2-9b-it:free',
+    inputCostPer1kTokens: 0, // Free model
+    outputCostPer1kTokens: 0, // Free model
+    maxTokens: 8192,
+    temperature: 0.7,
+  },
+  'microsoft/phi-3-mini-128k-instruct:free': {
+    name: 'microsoft/phi-3-mini-128k-instruct:free',
+    inputCostPer1kTokens: 0, // Free model
+    outputCostPer1kTokens: 0, // Free model
+    maxTokens: 128000,
+    temperature: 0.7,
+  },
   'openai/text-embedding-3-small': {
     name: 'openai/text-embedding-3-small',
     inputCostPer1kTokens: 0.00002, // $0.02 per 1M tokens
@@ -91,6 +113,14 @@ export const AI_MODELS: Record<string, AIModelConfig> = {
     inputCostPer1kTokens: 0.00015,
     outputCostPer1kTokens: 0.0006,
     maxTokens: 128000,
+    temperature: 0.7,
+  },
+  // Aliases for invalid model names - redirect to valid free models
+  'meta-llama/llama-3.1-8b-instruct:free': {
+    name: 'mistralai/mistral-7b-instruct:free', // Redirect to valid free model
+    inputCostPer1kTokens: 0,
+    outputCostPer1kTokens: 0,
+    maxTokens: 32768,
     temperature: 0.7,
   },
   'text-embedding-3-small': {
@@ -153,6 +183,7 @@ export class AIClient {
       defaultHeaders: {
         'HTTP-Referer': siteUrl,
         'X-Title': 'Recess POC',
+        'User-Agent': 'Recess POC/1.0 (http://localhost:3000)',
       },
     });
 
@@ -181,7 +212,7 @@ export class AIClient {
     usage: AIUsageMetrics;
   }> {
     const requestId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const model = request.model || 'openai/gpt-4o-mini';
+    const model = request.model || 'mistralai/mistral-7b-instruct:free'; // Use free model as default
     const modelConfig = AI_MODELS[model];
 
     if (!modelConfig) {
@@ -544,6 +575,11 @@ let globalAIClient: AIClient | null = null;
  * Get or create the global AI client instance.
  */
 export function getAIClient(): AIClient {
+  // In development, always create a new client to pick up env changes
+  if (process.env.NODE_ENV === 'development') {
+    return new AIClient();
+  }
+  
   if (!globalAIClient) {
     globalAIClient = new AIClient();
   }

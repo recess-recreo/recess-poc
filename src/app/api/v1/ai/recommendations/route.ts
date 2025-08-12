@@ -84,7 +84,13 @@ const RecommendationRequestSchema = z.union([
       includeScores: z.boolean().optional().default(false),
       diversityWeight: z.number().min(0).max(1).optional().default(0.3),
       useCache: z.boolean().optional().default(true),
-      model: z.enum(['gpt-4o-mini', 'gpt-4o']).optional().default('gpt-4o-mini'),
+      model: z.enum([
+        'gpt-4o-mini', 
+        'gpt-4o', 
+        'mistralai/mistral-7b-instruct:free',
+        'google/gemma-2-9b-it:free',
+        'microsoft/phi-3-mini-128k-instruct:free'
+      ]).optional().default('mistralai/mistral-7b-instruct:free'),
       includeMetrics: z.boolean().optional().default(false),
     }).optional().default({
       limit: 10,
@@ -92,7 +98,7 @@ const RecommendationRequestSchema = z.union([
       includeScores: false,
       diversityWeight: 0.3,
       useCache: true,
-      model: 'gpt-4o-mini',
+      model: 'mistralai/mistral-7b-instruct:free',
       includeMetrics: false
     }),
   }),
@@ -136,7 +142,13 @@ const RecommendationRequestSchema = z.union([
       includeScores: z.boolean().optional().default(false),
       diversityWeight: z.number().min(0).max(1).optional().default(0.3),
       useCache: z.boolean().optional().default(true),
-      model: z.enum(['gpt-4o-mini', 'gpt-4o']).optional().default('gpt-4o-mini'),
+      model: z.enum([
+        'gpt-4o-mini', 
+        'gpt-4o', 
+        'mistralai/mistral-7b-instruct:free',
+        'google/gemma-2-9b-it:free',
+        'microsoft/phi-3-mini-128k-instruct:free'
+      ]).optional().default('mistralai/mistral-7b-instruct:free'),
       includeMetrics: z.boolean().optional().default(false),
     }).optional().default({
       limit: 10,
@@ -144,7 +156,7 @@ const RecommendationRequestSchema = z.union([
       includeScores: false,
       diversityWeight: 0.3,
       useCache: true,
-      model: 'gpt-4o-mini',
+      model: 'mistralai/mistral-7b-instruct:free',
       includeMetrics: false
     }),
   }).refine(
