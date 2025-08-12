@@ -183,7 +183,7 @@ export class AIClient {
       defaultHeaders: {
         'HTTP-Referer': siteUrl,
         'X-Title': 'Recess POC',
-        'User-Agent': 'Recess POC/1.0 (http://localhost:3000)',
+        'User-Agent': `Recess POC/1.0 (${siteUrl})`,
       },
     });
 
