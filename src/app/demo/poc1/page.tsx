@@ -35,6 +35,7 @@ import Recommendations from './components/Recommendations';
 import EmailSimulation from './components/EmailSimulation';
 import CostTracker from './components/CostTracker';
 import PhaseIndicator, { type Phase } from './components/PhaseIndicator';
+import RecessHeader from '@/components/RecessHeader';
 
 // Import types
 import type { FamilyProfile, Recommendation, GeneratedEmail } from '@/types/ai';
@@ -469,13 +470,16 @@ export default function POC1DemoPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-neutral-0 to-secondary/5">
+      {/* Recess Header */}
+      <RecessHeader />
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Demo Header */}
         <div className="text-center mb-12 pt-4">
-          <h1 className="text-3xl font-bold text-neutral-100 mb-6">
-            Recess Concierge Demo
+          <h1 className="text-4xl font-bold text-primary mb-6">
+            AI-Powered Activity Matching
           </h1>
-          <p className="text-lg text-neutral-60 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg text-neutral-70 max-w-3xl mx-auto leading-relaxed">
             Experience how AI transforms natural language family descriptions into personalized activity 
             recommendations and automated provider outreach. This interactive demo showcases our complete 
             technical stack and business value proposition.
@@ -499,7 +503,7 @@ export default function POC1DemoPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-neutral-60">AI Cost:</span>
-                    <span className="font-medium text-green-600">
+                    <span className="font-medium text-accent-teal">
                       ${state.totalCost.toFixed(4)}
                     </span>
                   </div>
@@ -514,7 +518,7 @@ export default function POC1DemoPage() {
                   {state.generatedEmails.length > 0 && (
                     <div className="flex justify-between">
                       <span className="text-neutral-60">Emails Generated:</span>
-                      <span className="font-medium text-secondary">
+                      <span className="font-medium text-accent-orange">
                         {state.generatedEmails.length}
                       </span>
                     </div>

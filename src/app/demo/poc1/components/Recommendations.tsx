@@ -12,7 +12,8 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { getProviderImageUrl } from '../utils/imageUtils';
 import { 
   SparklesIcon, 
   HeartIcon as HeartOutline,
@@ -25,9 +26,11 @@ import {
   AcademicCapIcon,
   BeakerIcon,
   MusicalNoteIcon,
-  Squares2X2Icon
+  Squares2X2Icon,
+  PhotoIcon
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolid, FireIcon } from '@heroicons/react/24/solid';
+import Image from 'next/image';
 
 import type { FamilyProfile, Recommendation } from '@/types/ai';
 import RecommendationsMap from './MapWrapper';
@@ -255,6 +258,7 @@ export default function Recommendations({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<'all' | 'perfect_match' | 'good_fit'>('all');
   const [sortBy, setSortBy] = useState<'match_score' | 'price' | 'distance'>('match_score');
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
 
   // Helper function to get filtered family profile based on recommendation type
@@ -311,7 +315,16 @@ export default function Recommendations({
       location: getLocationDisplay(rec),
       category: getCategoryDisplay(rec),
       ageRange: getAgeRangeDisplay(rec),
-      imageUrl: "/about.jpeg" // Keep placeholder image
+      imageUrl: getProviderImageUrl(
+        rec.metadata?.provider?.coverImageFileName,
+        {
+          providerId: rec.metadata?.provider?.id,
+          providerName: getProviderDisplayName(rec),
+          category: getCategoryDisplay(rec),
+          imageType: 'cover'
+        }
+      ),
+      logoUrl: rec.metadata?.provider?.logoFileName
     }));
   }, [recommendations]);
 
@@ -364,10 +377,10 @@ export default function Recommendations({
 
   const getMatchTypeColor = (type: string) => {
     switch (type) {
-      case 'perfect_match': return 'bg-green-100 text-green-800';
-      case 'good_fit': return 'bg-blue-100 text-blue-800';
-      case 'worth_exploring': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'perfect_match': return 'bg-accent-pink/10 text-accent-pink border border-accent-pink/20';
+      case 'good_fit': return 'bg-primary/10 text-primary border border-primary/20';
+      case 'worth_exploring': return 'bg-secondary/10 text-secondary border border-secondary/20';
+      default: return 'bg-accent-teal/10 text-accent-teal border border-accent-teal/20';
     }
   };
 
@@ -404,27 +417,31 @@ export default function Recommendations({
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
       <div className="text-center space-y-4">
-        <div className="flex items-center justify-center space-x-2">
-          <SparklesIcon className="w-8 h-8 text-primary" />
-          <h2 className="text-2xl font-bold text-neutral-100">AI-Powered Recommendations</h2>
+        <div className="flex items-center justify-center space-x-3">
+          <div className="p-2 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-xl">
+            <SparklesIcon className="w-8 h-8 text-primary" />
+          </div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent-teal bg-clip-text text-transparent">
+            AI-Powered Recommendations
+          </h2>
         </div>
-        <p className="text-neutral-60 max-w-2xl mx-auto">
-          Based on your family profile, we found {recommendations.length} personalized activity matches. 
+        <p className="text-neutral-60 max-w-2xl mx-auto leading-relaxed">
+          Based on your family profile, we found <span className="font-semibold text-primary">{recommendations.length}</span> personalized activity matches. 
           Select the ones you&apos;re interested in for automated provider outreach.
         </p>
       </div>
 
       {/* Family Summary */}
-      <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-xl p-4">
-        <h3 className="font-medium text-neutral-100 mb-2">
+      <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-accent-teal/5 rounded-2xl p-6 border border-primary/10">
+        <h3 className="font-semibold text-neutral-100 mb-4 text-lg">
           {recommendationType === 'all_kids' ? 'Searching for All Children' :
            recommendationType && displayProfile.children.length === 1 ? `Searching for ${displayProfile.children[0].name}` :
            'Matching Profile Summary'}
         </h3>
         <div className="grid md:grid-cols-3 gap-4 text-sm">
-          <div className="flex items-center space-x-2">
-            <UsersIcon className="w-4 h-4 text-primary" />
-            <span className="text-neutral-70">
+          <div className="flex items-center space-x-3 p-3 bg-neutral-0/50 rounded-lg">
+            <UsersIcon className="w-5 h-5 text-primary flex-shrink-0" />
+            <span className="text-neutral-70 font-medium leading-relaxed">
               {displayProfile.children.length === 1 ? (
                 <>
                   1 child: {displayProfile.children[0].name} ({displayProfile.children[0].age})
@@ -444,15 +461,15 @@ export default function Recommendations({
               )}
             </span>
           </div>
-          <div className="flex items-center space-x-2">
-            <MapPinIcon className="w-4 h-4 text-secondary" />
-            <span className="text-neutral-70">
+          <div className="flex items-center space-x-3 p-3 bg-neutral-0/50 rounded-lg">
+            <MapPinIcon className="w-5 h-5 text-accent-teal flex-shrink-0" />
+            <span className="text-neutral-70 font-medium">
               {[familyProfile.location.neighborhood, familyProfile.location.city].filter(Boolean).join(', ') || 'Austin, TX area'}
             </span>
           </div>
-          <div className="flex items-center space-x-2">
-            <CurrencyDollarIcon className="w-4 h-4 text-tertiary-orange" />
-            <span className="text-neutral-70">
+          <div className="flex items-center space-x-3 p-3 bg-neutral-0/50 rounded-lg">
+            <CurrencyDollarIcon className="w-5 h-5 text-accent-orange flex-shrink-0" />
+            <span className="text-neutral-70 font-medium">
               {familyProfile.preferences?.budget?.max 
                 ? `Up to $${familyProfile.preferences.budget.max}/month`
                 : 'Budget flexible'
@@ -465,13 +482,13 @@ export default function Recommendations({
 
       {/* View Tabs */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center bg-neutral-10 rounded-lg p-1">
+        <div className="flex items-center bg-gradient-to-r from-neutral-10 to-neutral-20 rounded-xl p-1.5 border border-neutral-30">
           <button
             onClick={() => setViewMode('grid')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+            className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
               viewMode === 'grid'
-                ? 'bg-neutral-0 text-neutral-100 shadow-sm'
-                : 'text-neutral-60 hover:text-neutral-80'
+                ? 'bg-gradient-to-r from-primary to-accent-teal text-neutral-0 shadow-lg scale-105'
+                : 'text-neutral-60 hover:text-primary hover:bg-neutral-0/50'
             }`}
           >
             <Squares2X2Icon className="w-4 h-4" />
@@ -479,10 +496,10 @@ export default function Recommendations({
           </button>
           <button
             onClick={() => setViewMode('map')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+            className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
               viewMode === 'map'
-                ? 'bg-neutral-0 text-neutral-100 shadow-sm'
-                : 'text-neutral-60 hover:text-neutral-80'
+                ? 'bg-gradient-to-r from-primary to-accent-teal text-neutral-0 shadow-lg scale-105'
+                : 'text-neutral-60 hover:text-primary hover:bg-neutral-0/50'
             }`}
           >
             <MapPinIcon className="w-4 h-4" />
@@ -490,21 +507,21 @@ export default function Recommendations({
           </button>
         </div>
 
-        <div className="text-sm text-neutral-60">
-          {selectedIds.size} of {filteredRecommendations.length} selected
+        <div className="text-sm font-medium">
+          <span className="text-primary font-semibold">{selectedIds.size}</span> of <span className="text-neutral-70">{filteredRecommendations.length}</span> selected
         </div>
       </div>
 
       {/* Filters and Sort - Only show in grid view */}
       {viewMode === 'grid' && (
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-neutral-0 rounded-xl p-4 border border-neutral-20">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-neutral-70">Filter:</label>
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-neutral-0 to-neutral-5 rounded-2xl p-6 border border-neutral-20 shadow-sm">
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-3">
+              <label className="text-sm font-semibold text-neutral-80">Filter:</label>
               <select 
                 value={filter}
                 onChange={(e) => setFilter(e.target.value as typeof filter)}
-                className="text-sm border border-neutral-30 rounded px-2 py-1 bg-neutral-0 text-neutral-100"
+                className="text-sm border border-primary/30 rounded-lg px-3 py-2 bg-neutral-0 text-neutral-100 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
               >
                 <option value="all">All Matches ({enhancedRecommendations.length})</option>
                 <option value="perfect_match">Perfect Matches ({enhancedRecommendations.filter(r => r.recommendationType === 'perfect_match').length})</option>
@@ -512,12 +529,12 @@ export default function Recommendations({
               </select>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-neutral-70">Sort:</label>
+            <div className="flex items-center space-x-3">
+              <label className="text-sm font-semibold text-neutral-80">Sort:</label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="text-sm border border-neutral-30 rounded px-2 py-1 bg-neutral-0 text-neutral-100"
+                className="text-sm border border-primary/30 rounded-lg px-3 py-2 bg-neutral-0 text-neutral-100 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
               >
                 <option value="match_score">Best Match</option>
                 <option value="price">Price (Low to High)</option>
@@ -526,7 +543,7 @@ export default function Recommendations({
             </div>
           </div>
 
-          <div className="text-sm text-neutral-60">
+          <div className="text-sm font-medium bg-primary/10 text-primary px-3 py-1.5 rounded-full border border-primary/20">
             Showing {filteredRecommendations.length} results
           </div>
         </div>
@@ -535,162 +552,204 @@ export default function Recommendations({
       {/* Content Area */}
       {viewMode === 'grid' ? (
         /* Recommendations Grid */
-        <div className="grid gap-4">
+        <div className="grid gap-4 sm:gap-6 lg:gap-8">
           {filteredRecommendations.map((recommendation, index) => {
           const isSelected = selectedIds.has(recommendation.providerId);
           
           return (
             <div 
               key={recommendation.providerId}
-              className={`bg-neutral-0 rounded-xl border transition-all duration-200 overflow-hidden ${
+              className={`bg-neutral-0 rounded-2xl border transition-all duration-300 overflow-hidden shadow-sm hover:shadow-lg ${
                 isSelected 
-                  ? 'border-primary shadow-lg ring-2 ring-primary/20' 
-                  : 'border-neutral-20 hover:border-neutral-30 hover:shadow-sm'
+                  ? 'border-primary shadow-xl ring-2 ring-primary/30 scale-[1.02]' 
+                  : 'border-neutral-20 hover:border-primary/30'
               }`}
             >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    {/* Provider and Program */}
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-lg font-semibold text-neutral-100">
+              {/* Provider Image Section */}
+              <div className="relative h-64 sm:h-52 md:h-48 lg:h-56 xl:h-52 overflow-hidden">
+                {recommendation.imageUrl && !failedImages.has(recommendation.providerId) ? (
+                  <Image
+                    src={recommendation.imageUrl}
+                    alt={`${recommendation.providerName} cover image`}
+                    fill
+                    className="object-cover transition-transform duration-300 hover:scale-105"
+                    sizes="(max-width: 640px) 100vw, (max-width: 768px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                    priority={index < 3}
+                    onError={() => {
+                      setFailedImages(prev => new Set(prev).add(recommendation.providerId));
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-primary/20 via-secondary/20 to-accent-teal/20 flex items-center justify-center">
+                    <PhotoIcon className="w-16 h-16 text-neutral-40" />
+                    <span className="absolute bottom-4 left-4 text-xs text-neutral-50 bg-neutral-0/80 px-2 py-1 rounded">
+                      No image available
+                    </span>
+                  </div>
+                )}
+                
+                {/* Overlay with provider logo if available */}
+                {recommendation.logoUrl && (
+                  <div className="absolute bottom-4 left-4 w-12 h-12 bg-neutral-0 rounded-lg shadow-lg p-1">
+                    <Image
+                      src={recommendation.logoUrl}
+                      alt={`${recommendation.providerName} logo`}
+                      fill
+                      className="object-contain rounded-md"
+                    />
+                  </div>
+                )}
+                
+                {/* Selection Toggle - moved to image overlay */}
+                <button
+                  onClick={() => handleSelection(recommendation.providerId, !isSelected)}
+                  className={`absolute top-4 right-4 p-3 rounded-full transition-all duration-200 backdrop-blur-sm ${
+                    isSelected 
+                      ? 'bg-primary text-neutral-0 shadow-lg scale-110' 
+                      : 'bg-neutral-0/90 text-neutral-50 hover:bg-neutral-0 hover:text-primary hover:scale-105'
+                  }`}
+                >
+                  {isSelected ? <HeartSolid className="w-5 h-5" /> : <HeartOutline className="w-5 h-5" />}
+                </button>
+              </div>
+              
+              <div className="p-4 sm:p-6">
+                {/* Header Section */}
+                <div className="mb-4">
+                  {/* Provider and Program */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-neutral-100 mb-1">
                         {recommendation.providerName}
                       </h3>
-                      <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1 ${getMatchTypeColor(recommendation.recommendationType)}`}>
-                        {getMatchTypeIcon(recommendation.recommendationType)}
-                        <span>{recommendation.recommendationType.replace('_', ' ')}</span>
-                      </div>
+                      <h4 className="text-lg font-semibold text-neutral-70 mb-2">
+                        {recommendation.programName}
+                      </h4>
                     </div>
-                    
-                    <h4 className="text-md font-medium text-neutral-80 mb-1">
-                      {recommendation.programName}
-                    </h4>
-                    
-                    <p className="text-xs text-neutral-50 mb-2">
+                    <div className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-1.5 ${getMatchTypeColor(recommendation.recommendationType)}`}>
+                      {getMatchTypeIcon(recommendation.recommendationType)}
+                      <span className="capitalize">{recommendation.recommendationType.replace('_', ' ')}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3 mb-3">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-teal/10 text-accent-teal border border-accent-teal/20">
                       {recommendation.category}
-                    </p>
+                    </span>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-orange/10 text-accent-orange border border-accent-orange/20">
+                      {recommendation.ageRange}
+                    </span>
+                  </div>
+                  
+                  <p className="text-sm text-neutral-60 mb-4 line-clamp-2 leading-relaxed">
+                    {recommendation.description}
+                  </p>
+
+                  {/* Match Score and Details */}
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="flex items-center space-x-2 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-full px-3 py-1.5">
+                      <div className={`w-3 h-3 rounded-full ${
+                        recommendation.matchScore > 0.8 ? 'bg-accent-pink shadow-lg shadow-accent-pink/30' :
+                        recommendation.matchScore > 0.6 ? 'bg-secondary shadow-lg shadow-secondary/30' : 
+                        'bg-accent-teal shadow-lg shadow-accent-teal/30'
+                      }`} />
+                      <span className="text-sm font-semibold text-primary">
+                        {Math.round(recommendation.matchScore * 100)}% match
+                      </span>
+                    </div>
                     
-                    <p className="text-sm text-neutral-60 mb-3 line-clamp-2">
-                      {recommendation.description}
-                    </p>
-
-                    {/* Match Score and Details */}
-                    <div className="flex items-center space-x-4 mb-3">
-                      <div className="flex items-center space-x-1">
-                        <div className={`w-3 h-3 rounded-full ${
-                          recommendation.matchScore > 0.8 ? 'bg-green-500' :
-                          recommendation.matchScore > 0.6 ? 'bg-yellow-500' : 'bg-gray-500'
-                        }`} />
-                        <span className="text-sm text-neutral-60">
-                          {Math.round(recommendation.matchScore * 100)}% match
+                    {recommendation.rating && recommendation.reviewCount ? (
+                      <div className="flex items-center space-x-1.5 bg-secondary/10 rounded-full px-3 py-1.5">
+                        <StarIcon className="w-4 h-4 text-secondary fill-current" />
+                        <span className="text-sm font-semibold text-secondary">
+                          {recommendation.rating} ({recommendation.reviewCount})
                         </span>
                       </div>
-                      
-                      {recommendation.rating && recommendation.reviewCount ? (
-                        <div className="flex items-center space-x-1">
-                          <StarIcon className="w-4 h-4 text-yellow-500 fill-current" />
-                          <span className="text-sm text-neutral-60">
-                            {recommendation.rating} ({recommendation.reviewCount} reviews)
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-1">
-                          <span className="text-xs text-neutral-40">
-                            New provider
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Match Reasons */}
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-2">
-                        {recommendation.matchReasons.slice(0, 3).map((reason, reasonIndex) => (
-                          <span 
-                            key={reasonIndex}
-                            className="text-xs bg-secondary/10 text-secondary px-2 py-1 rounded-full"
-                          >
-                            {reason}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Details Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <MapPinIcon className="w-4 h-4 text-neutral-50" />
-                        <span className="text-neutral-60">{recommendation.location}</span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <CurrencyDollarIcon className="w-4 h-4 text-neutral-50" />
-                        <span className="text-neutral-60">
-                          {recommendation.price}
+                    ) : (
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-xs px-2 py-1 bg-neutral-10 text-neutral-50 rounded-full">
+                          New provider
                         </span>
                       </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <ClockIcon className="w-4 h-4 text-neutral-50" />
-                        <span className="text-neutral-60">
-                          {recommendation.schedule}
-                        </span>
-                      </div>
+                    )}
+                  </div>
 
-                      <div className="flex items-center space-x-2">
-                        <UsersIcon className="w-4 h-4 text-neutral-50" />
-                        <span className="text-neutral-60">
-                          {recommendation.ageRange}
+                  {/* Match Reasons */}
+                  <div className="mb-4">
+                    <div className="flex flex-wrap gap-2">
+                      {recommendation.matchReasons.slice(0, 3).map((reason, reasonIndex) => (
+                        <span 
+                          key={reasonIndex}
+                          className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full font-medium border border-primary/20"
+                        >
+                          {reason}
                         </span>
-                      </div>
-                    </div>
-
-                    {/* Matching Interests */}
-                    <div className="mt-3">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="text-xs font-medium text-neutral-70">Matches interests:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {recommendation.interests.slice(0, 4).map((interest, interestIndex) => (
-                          <div 
-                            key={interestIndex}
-                            className="flex items-center space-x-1 text-xs bg-tertiary-pink/10 text-tertiary-pink px-2 py-1 rounded-full"
-                          >
-                            {getInterestIcon(interest)}
-                            <span>{interest}</span>
-                          </div>
-                        ))}
-                      </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Selection Toggle */}
-                  <button
-                    onClick={() => handleSelection(recommendation.providerId, !isSelected)}
-                    className={`ml-4 p-3 rounded-full transition-all duration-200 ${
-                      isSelected 
-                        ? 'bg-primary text-neutral-0 shadow-lg' 
-                        : 'bg-neutral-10 text-neutral-50 hover:bg-neutral-20'
-                    }`}
-                  >
-                    {isSelected ? <HeartSolid className="w-6 h-6" /> : <HeartOutline className="w-6 h-6" />}
-                  </button>
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div className="flex items-center space-x-3 p-3 bg-neutral-5 rounded-lg">
+                      <MapPinIcon className="w-5 h-5 text-accent-teal flex-shrink-0" />
+                      <span className="text-neutral-70 font-medium">{recommendation.location}</span>
+                    </div>
+                    
+                    <div className="flex items-center space-x-3 p-3 bg-neutral-5 rounded-lg">
+                      <CurrencyDollarIcon className="w-5 h-5 text-accent-orange flex-shrink-0" />
+                      <span className="text-neutral-70 font-medium">
+                        {recommendation.price}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center space-x-3 p-3 bg-neutral-5 rounded-lg">
+                      <ClockIcon className="w-5 h-5 text-accent-pink flex-shrink-0" />
+                      <span className="text-neutral-70 font-medium">
+                        {recommendation.schedule}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 bg-neutral-5 rounded-lg">
+                      <UsersIcon className="w-5 h-5 text-primary flex-shrink-0" />
+                      <span className="text-neutral-70 font-medium">
+                        {recommendation.ageRange}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Matching Interests */}
+                  <div className="mt-4">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="text-sm font-semibold text-neutral-80">Matching interests:</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {recommendation.interests.slice(0, 4).map((interest, interestIndex) => (
+                        <div 
+                          key={interestIndex}
+                          className="flex items-center space-x-1.5 text-xs bg-gradient-to-r from-accent-pink/10 to-accent-teal/10 text-accent-pink px-3 py-1.5 rounded-full border border-accent-pink/20 font-medium"
+                        >
+                          {getInterestIcon(interest)}
+                          <span>{interest}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Logistical Fit Indicators */}
-                <div className="grid grid-cols-4 gap-2 pt-3 border-t border-neutral-20">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t border-neutral-10">
                   {[
-                    { key: 'location', label: 'Location', icon: MapPinIcon },
-                    { key: 'schedule', label: 'Schedule', icon: ClockIcon },
-                    { key: 'budget', label: 'Budget', icon: CurrencyDollarIcon },
-                    { key: 'transportation', label: 'Transport', icon: UsersIcon }
-                  ].map(({ key, label, icon: Icon }) => {
+                    { key: 'location', label: 'Location', icon: MapPinIcon, colorClass: (fits: boolean) => fits ? 'bg-accent-teal/10 text-accent-teal border-accent-teal/20' : 'bg-neutral-10 text-neutral-40 border-neutral-20' },
+                    { key: 'schedule', label: 'Schedule', icon: ClockIcon, colorClass: (fits: boolean) => fits ? 'bg-accent-pink/10 text-accent-pink border-accent-pink/20' : 'bg-neutral-10 text-neutral-40 border-neutral-20' },
+                    { key: 'budget', label: 'Budget', icon: CurrencyDollarIcon, colorClass: (fits: boolean) => fits ? 'bg-accent-orange/10 text-accent-orange border-accent-orange/20' : 'bg-neutral-10 text-neutral-40 border-neutral-20' },
+                    { key: 'transportation', label: 'Transport', icon: UsersIcon, colorClass: (fits: boolean) => fits ? 'bg-primary/10 text-primary border-primary/20' : 'bg-neutral-10 text-neutral-40 border-neutral-20' }
+                  ].map(({ key, label, icon: Icon, colorClass }) => {
                     const fits = recommendation.logisticalFit[key as keyof typeof recommendation.logisticalFit];
                     return (
-                      <div key={key} className={`flex items-center space-x-1 text-xs ${fits ? 'text-green-600' : 'text-neutral-40'}`}>
-                        <Icon className="w-3 h-3" />
-                        <span>{label}</span>
-                        {fits && <CheckCircleIcon className="w-3 h-3" />}
+                      <div key={key} className={`flex items-center justify-center space-x-1.5 text-xs p-2 rounded-lg transition-all duration-200 border ${colorClass(fits)}`}>
+                        <Icon className="w-4 h-4" />
+                        <span className="font-medium">{label}</span>
+                        {fits && <CheckCircleIcon className="w-4 h-4" />}
                       </div>
                     );
                   })}
@@ -713,19 +772,19 @@ export default function Recommendations({
 
       {/* Selection Summary and Continue */}
       {selectedIds.size > 0 && (
-        <div className="bg-neutral-0 rounded-xl border border-neutral-20 p-6">
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-accent-teal/5 rounded-2xl border border-primary/20 p-6 shadow-lg">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h3 className="font-semibold text-neutral-100 mb-1">
-                Ready to Connect with {selectedIds.size} Provider{selectedIds.size === 1 ? '' : 's'}
+              <h3 className="font-bold text-xl text-neutral-100 mb-2">
+                Ready to Connect with <span className="text-primary">{selectedIds.size}</span> Provider{selectedIds.size === 1 ? '' : 's'}
               </h3>
-              <p className="text-sm text-neutral-60">
+              <p className="text-sm text-neutral-70 leading-relaxed">
                 We&apos;ll generate personalized outreach emails for each selected provider
               </p>
             </div>
             <button
               onClick={handleContinue}
-              className="px-6 py-3 bg-primary hover:bg-tertiary-night text-neutral-0 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="px-6 py-3 bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-accent-teal text-neutral-0 rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform"
             >
               Generate Provider Emails
             </button>

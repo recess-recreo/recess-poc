@@ -99,9 +99,9 @@ export default function FamilyInput({
       {showSamples && (
         <div className="bg-neutral-0 rounded-xl border border-neutral-20 p-6">
           <div className="flex items-center space-x-2 mb-4">
-            <SparklesIcon className="w-5 h-5 text-orange-500" />
+            <SparklesIcon className="w-5 h-5 text-accent-orange" />
             <h3 className="font-medium text-neutral-100">Quick Start Examples</h3>
-            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">
+            <span className="text-xs bg-accent-orange/10 text-accent-orange px-2 py-1 rounded-full">
               Click to use
             </span>
           </div>
@@ -119,7 +119,7 @@ export default function FamilyInput({
                   <h4 className="font-medium text-neutral-100 text-sm">
                     {sample.title}
                   </h4>
-                  <span className="text-xs bg-secondary/10 text-secondary px-2 py-1 rounded-full ml-2 flex-shrink-0">
+                  <span className="text-xs bg-secondary/10 text-secondary/80 px-2 py-1 rounded-full ml-2 flex-shrink-0">
                     {sample.category}
                   </span>
                 </div>
@@ -164,9 +164,9 @@ Example: 'Hi! I'm Maria with two kids - Sofia (8) loves dance and art, and Carlo
           <div className="absolute bottom-3 right-3 flex items-center space-x-2">
             <span className={`text-xs transition-colors ${
               charCount > maxChars * 0.9 
-                ? 'text-red-500' 
+                ? 'text-accent-pink' 
                 : charCount > maxChars * 0.7 
-                ? 'text-orange-500' 
+                ? 'text-accent-orange' 
                 : 'text-neutral-50'
             }`}>
               {charCount}/{maxChars}
@@ -229,7 +229,7 @@ Example: 'Hi! I'm Maria with two kids - Sofia (8) loves dance and art, and Carlo
 
         {/* Requirements */}
         {charCount > 0 && charCount < 50 && (
-          <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded-lg">
+          <div className="text-sm text-accent-orange bg-accent-orange/10 p-3 rounded-lg">
             Please add more details (minimum 50 characters). Include information about your children, 
             their interests, your location, and what kind of activities you&apos;re looking for.
           </div>
@@ -255,7 +255,7 @@ Example: 'Hi! I'm Maria with two kids - Sofia (8) loves dance and art, and Carlo
             </div>
           </div>
           <div className="flex items-start space-x-2">
-            <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0" />
+            <div className="w-2 h-2 bg-accent-teal rounded-full mt-2 flex-shrink-0" />
             <div>
               <div className="font-medium text-neutral-80">Logistics</div>
               <div className="text-neutral-60">Location, budget, schedule</div>

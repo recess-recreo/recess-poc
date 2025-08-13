@@ -102,7 +102,7 @@ export default function PhaseIndicator({
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
                     isCompleted
-                      ? 'bg-green-100 text-green-600'
+                      ? 'bg-accent-teal/10 text-accent-teal'
                       : isActive
                       ? 'bg-primary/10 text-primary border-2 border-primary'
                       : 'bg-neutral-10 text-neutral-50 border border-neutral-30'
@@ -140,7 +140,7 @@ export default function PhaseIndicator({
                   <h3
                     className={`font-medium transition-colors duration-200 ${
                       isCompleted
-                        ? 'text-green-700'
+                        ? 'text-accent-teal'
                         : isActive
                         ? 'text-primary'
                         : 'text-neutral-60'
@@ -163,7 +163,7 @@ export default function PhaseIndicator({
                 <p
                   className={`text-sm mt-1 transition-colors duration-200 ${
                     isCompleted
-                      ? 'text-green-600'
+                      ? 'text-accent-teal/80'
                       : isActive
                       ? 'text-neutral-70'
                       : 'text-neutral-50'
@@ -186,7 +186,7 @@ export default function PhaseIndicator({
       <div className="mt-6 pt-4 border-t border-neutral-20">
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <div className="text-lg font-semibold text-green-600">{completedCount}</div>
+            <div className="text-lg font-semibold text-accent-teal">{completedCount}</div>
             <div className="text-xs text-neutral-50">Completed</div>
           </div>
           <div>
@@ -196,7 +196,7 @@ export default function PhaseIndicator({
             <div className="text-xs text-neutral-50">Active</div>
           </div>
           <div>
-            <div className="text-lg font-semibold text-neutral-60">
+            <div className="text-lg font-semibold text-accent-pink">
               {phases.filter(p => p.status === 'pending').length}
             </div>
             <div className="text-xs text-neutral-50">Remaining</div>
