@@ -1,11 +1,15 @@
 /**
- * Recess Header Component - Brand-focused navigation header
+ * Recess Header Component with Logo Options
  * 
- * Features:
- * - Recess brand colors and styling
- * - Responsive design with mobile menu
- * - Clean, professional layout
- * - Accessible navigation patterns
+ * Alternate version of the header that showcases different logo configurations.
+ * This component demonstrates various ways to implement the Recess branding.
+ * 
+ * WHY: Created to provide flexibility in logo presentation:
+ * - Option 1: Icon + text name (current default)
+ * - Option 2: Icon + text logo SVG
+ * - Option 3: Icon only (for mobile/compact views)
+ * 
+ * USAGE: Replace RecessHeader with this component in layout.tsx to test different options
  */
 
 'use client';
@@ -14,12 +18,17 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import RecessIcon from './icons/RecessIcon';
+import RecessTextLogo from './icons/RecessTextLogo';
 
 interface RecessHeaderProps {
   className?: string;
+  logoStyle?: 'icon-with-text' | 'icon-with-svg-text' | 'icon-only';
 }
 
-export default function RecessHeader({ className = '' }: RecessHeaderProps) {
+export default function RecessHeaderWithOptions({ 
+  className = '',
+  logoStyle = 'icon-with-text'
+}: RecessHeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const toggleMobileMenu = () => {
@@ -39,22 +48,72 @@ export default function RecessHeader({ className = '' }: RecessHeaderProps) {
           {/* Logo and Brand */}
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0 flex items-center group">
-              {/* Recess Logo Icon */}
-              <div className="flex items-center justify-center mr-3 transition-transform duration-200 group-hover:scale-105">
-                <RecessIcon 
-                  width={32} 
-                  height={34} 
-                  className="text-white"
-                />
-              </div>
-              <div className="text-white">
-                <h1 className="text-xl font-bold tracking-tight">
-                  Recess
-                </h1>
-                <p className="text-xs text-brand-blue-100 -mt-1">
-                  Concierge Demo
-                </p>
-              </div>
+              
+              {logoStyle === 'icon-with-text' && (
+                <>
+                  {/* Icon with HTML text */}
+                  <div className="flex items-center justify-center mr-3 transition-transform duration-200 group-hover:scale-105">
+                    <RecessIcon 
+                      width={32} 
+                      height={34} 
+                      className="text-white"
+                    />
+                  </div>
+                  <div className="text-white">
+                    <h1 className="text-xl font-bold tracking-tight">
+                      Recess
+                    </h1>
+                    <p className="text-xs text-brand-blue-100 -mt-1">
+                      Concierge Demo
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {logoStyle === 'icon-with-svg-text' && (
+                <>
+                  {/* Icon with SVG text logo */}
+                  <div className="flex items-center justify-center mr-3 transition-transform duration-200 group-hover:scale-105">
+                    <RecessIcon 
+                      width={32} 
+                      height={34} 
+                      className="text-white"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <RecessTextLogo 
+                      width={61} 
+                      height={16} 
+                      className="text-white"
+                    />
+                    <p className="text-xs text-brand-blue-100 mt-0.5">
+                      Concierge Demo
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {logoStyle === 'icon-only' && (
+                <>
+                  {/* Icon only with larger size */}
+                  <div className="flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
+                    <RecessIcon 
+                      width={40} 
+                      height={42} 
+                      className="text-white"
+                    />
+                  </div>
+                  <div className="ml-3 text-white md:block hidden">
+                    <h1 className="text-xl font-bold tracking-tight">
+                      Recess
+                    </h1>
+                    <p className="text-xs text-brand-blue-100 -mt-1">
+                      Concierge Demo
+                    </p>
+                  </div>
+                </>
+              )}
+              
             </Link>
           </div>
 
